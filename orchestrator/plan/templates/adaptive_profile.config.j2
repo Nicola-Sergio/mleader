@@ -1,0 +1,37 @@
+// adaptive_profile.config
+// Generato automaticamente da ftd-orchestrator
+// Data: {{ generated_at }}
+// Host: {{ hostname }}
+// GPU: {{ gpu_info }}
+// RAM disponibile: {{ ram_available_gb | round(1) }}GB
+// CPU threads: {{ cpu_threads }}
+// Fonte parametri: {{ source }}
+//
+// NON modificare manualmente.
+// Rigenera con: ftd-orchestrator run --repo-root <path>
+
+profiles {
+    adaptive_profile {
+
+        // ── Segmentatore ──────────────────────────────────────────────
+        params.brain_segmenter   = "{{ brain_segmenter }}"
+        {% if fastsurfer_device %}
+        params.fastsurfer_device = "{{ fastsurfer_device }}"
+        params.fastsurfer_threads = {{ fastsurfer_threads }}
+        {% endif %}
+
+        // ── Parallelismo ──────────────────────────────────────────────
+        params.maxforks          = {{ maxforks_segmenter }}
+        params.pyradiomics_jobs  = {{ pyradiomics_jobs }}
+
+        // ── maxForks per processo ─────────────────────────────────────
+        process {
+            withName: '{{ segmenter_process_name }}' {
+                maxForks = {{ maxforks_segmenter }}
+            }
+            withName: 'feature_extraction' {
+                maxForks = {{ maxforks_feature_extraction }}
+            }
+        }
+    }
+}

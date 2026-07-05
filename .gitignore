@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+.pytest_cache/
+.nextflow/
+.nextflow.log*
+work/
+reports/
+adaptive_profile.config
+*.nii
+*.nii.gz
+*.mgz

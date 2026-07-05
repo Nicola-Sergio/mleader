@@ -1,0 +1,31 @@
+[build-system] #statements to build program
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project] #project definition
+name = "ftd-orchestrator"
+version = "0.1.0"
+description = "Infrastructure-aware module for adaptive MLOps pipeline orchestration"
+requires-python = ">=3.10"
+dependencies = [ #peer dependencies
+    "psutil>=5.9",
+    "jinja2>=3.1",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-mock>=3.0",
+]
+
+[project.scripts] #it creates a Python script under /venv/bin/ with specified name that invokes the orchestrator cli code
+ftd-orchestrator = "orchestrator.cli:main"
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["orchestrator*"]
+
+[tool.setuptools.package-data]
+orchestrator = ["plan/templates/*.j2", "knowledge_base/*.yaml"]
