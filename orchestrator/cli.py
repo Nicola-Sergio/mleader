@@ -116,6 +116,19 @@ def main() -> None:
         parser.print_help()
         sys.exit(0)
 
+    # ── Validazione repo_root ─────────────────────────────────────────
+    from pathlib import Path
+    repo_root_path = Path(args.repo_root).resolve()
+    if not repo_root_path.exists():
+        print(f"\n[ERRORE] Il path specificato non esiste: {repo_root_path}")
+        print("Verifica il valore di --repo-root e riprova.")
+        sys.exit(1)
+    if not repo_root_path.is_dir():
+        print(f"\n[ERRORE] Il path specificato non è una directory: {repo_root_path}")
+        sys.exit(1)
+    # Normalizza args.repo_root al path assoluto risolto
+    args.repo_root = str(repo_root_path)
+
     # ── MONITOR ───────────────────────────────────────────────────────
     profile = run_monitor(repo_root=args.repo_root)
 
