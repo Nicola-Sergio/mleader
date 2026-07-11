@@ -4,22 +4,13 @@ Verifica nextflow version, docker GPU runtime, licenze, container buildati.
 """
 
 from __future__ import annotations
+from typing import Optional
 
 import re
 import subprocess
 from pathlib import Path
 
 from .hardware import HardwareProfile
-
-
-# Container Docker richiesti dalla pipeline FTD
-REQUIRED_CONTAINERS = [
-    "freesurfer",
-    "fsl",
-    "pyradiomics",
-    "ftd-training",
-]
-
 
 def check_nextflow_version(profile: HardwareProfile) -> None:
     """
@@ -80,10 +71,32 @@ def check_fs_license(profile: HardwareProfile, repo_root: str = ".") -> None:
     profile.fs_license_present = license_path.exists()
 
 
-def check_containers(profile: HardwareProfile) -> None:
+def check_containers(
+    profile: HardwareProfile,
+    repo_root: str = ".",
+    compose_file: Optional[str] = None,
+) -> None:
     """
-    Verifica quali container Docker richiesti dalla pipeline sono già buildati.
+    Verifica quali container Docker richiesti dalla pipeline sono già
+    buildati, leggendo i nomi dal docker-compose file invece di
+    hardcodarli nel modulo.
+
+    Se compose_file è specificato, usa quello. Altrimenti cerca
+    docker-compose.yml e docker-compose.yaml nella root del repo.
     """
+    from .pipeline_config import parse_docker_images
+
+    required = parse_docker_images(repo_root, compose_file)
+
+    if not required:
+        print(
+            "[Monitor] Nessun docker-compose trovato o nessuna immagine "
+            "definita — check container saltato."
+        )
+        profile.containers_built = []
+        profile.containers_missing = []
+        return
+
     try:
         out = subprocess.check_output(
             ["docker", "images", "--format", "{{.Repository}}"],
@@ -94,8 +107,8 @@ def check_containers(profile: HardwareProfile) -> None:
     except (subprocess.SubprocessError, FileNotFoundError):
         available = set()
 
-    profile.containers_built = [c for c in REQUIRED_CONTAINERS if c in available]
-    profile.containers_missing = [c for c in REQUIRED_CONTAINERS if c not in available]
+    profile.containers_built = [c for c in required if c in available]
+    profile.containers_missing = [c for c in required if c not in available]
 
 
 def run_environment_checks(profile: HardwareProfile, repo_root: str = ".") -> None:

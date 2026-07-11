@@ -9,7 +9,8 @@ from .environment import run_environment_checks
 from .preflight import run_preflight_checks
 
 
-def run_monitor(repo_root: str = ".") -> HardwareProfile:
+def run_monitor(repo_root: str = ".",
+                compose_file: Optional[str] = None) -> HardwareProfile:
     """
     Esegue l'intera fase Monitor:
     1. Hardware profiling (GPU, RAM, CPU, disco)
@@ -22,7 +23,7 @@ def run_monitor(repo_root: str = ".") -> HardwareProfile:
     profile = probe_hardware(work_dir=repo_root)
 
     print("[Monitor] Verifica ambiente...")
-    run_environment_checks(profile, repo_root=repo_root)
+    run_environment_checks(profile, repo_root=repo_root, compose_file=compose_file)
 
     print("[Monitor] Preflight checks...")
     run_preflight_checks(profile)

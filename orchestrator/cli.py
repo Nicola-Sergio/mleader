@@ -101,6 +101,12 @@ def main() -> None:
         default=None,
         help="Path al file .nii campione per il profiling VRAM (opzionale)",
     )
+    run_parser.add_argument(
+    "--compose-file",
+    default=None,
+    help="Nome del docker-compose file (default: cerca docker-compose.yml "
+         "o docker-compose.yaml nella root del repo)",
+)
 
     # ── Comando: check ────────────────────────────────────────────────
     check_parser = subparsers.add_parser(
@@ -109,6 +115,12 @@ def main() -> None:
     )
     check_parser.add_argument("--repo-root", default=".")
     check_parser.add_argument("--output-config", default="adaptive_profile.config")
+    check_parser.add_argument(
+        "--compose-file",
+        default=None,
+        help="Nome del docker-compose file (default: cerca docker-compose.yml "
+            "o docker-compose.yaml nella root del repo)",
+    )
 
     args = parser.parse_args()
 
@@ -130,7 +142,10 @@ def main() -> None:
     args.repo_root = str(repo_root_path)
 
     # ── MONITOR ───────────────────────────────────────────────────────
-    profile = run_monitor(repo_root=args.repo_root)
+    profile = run_monitor(
+        repo_root=args.repo_root,
+        compose_file=getattr(args, "compose_file", None)
+        )
 
     if not profile.preflight_passed:
         print("\n[ERRORE] Preflight check falliti — impossibile procedere:\n")
