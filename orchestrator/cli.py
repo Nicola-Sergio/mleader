@@ -99,7 +99,19 @@ def main() -> None:
     run_parser.add_argument(
         "--dry-run-sample",
         default=None,
-        help="Path al file .nii campione per il profiling VRAM (opzionale)",
+        help="Path to a sample .nii file for VRAM profiling via dry-run (optional)",
+    )
+    run_parser.add_argument(
+        "--traces-dir",
+        default=None,
+        help="Custom directory containing trace TSV files "
+             "(default: <repo-root>/reports/traces/<pipeline>/)",
+    )
+    run_parser.add_argument(
+        "--pipeline-type",
+        default="preprocessing",
+        choices=["preprocessing", "training"],
+        help="Pipeline type — determines which trace folder to read (default: preprocessing)",
     )
     run_parser.add_argument(
     "--compose-file",
@@ -120,6 +132,18 @@ def main() -> None:
         default=None,
         help="Nome del docker-compose file (default: cerca docker-compose.yml "
             "o docker-compose.yaml nella root del repo)",
+    )
+    check_parser.add_argument(
+        "--traces-dir",
+        default=None,
+        help="Custom directory containing trace TSV files "
+             "(default: <repo-root>/reports/traces/<pipeline>/)",
+    )
+    check_parser.add_argument(
+        "--pipeline-type",
+        default="preprocessing",
+        choices=["preprocessing", "training"],
+        help="Pipeline type — determines which trace folder to read (default: preprocessing)",
     )
 
     args = parser.parse_args()
@@ -157,9 +181,12 @@ def main() -> None:
     dry_run_sample = getattr(args, "dry_run_sample", None)
     plan = run_analyze(
         profile,
+        repo_root=args.repo_root,
+        pipeline=getattr(args, "pipeline_type", "preprocessing"),
         dry_run=bool(dry_run_sample),
         sample_nii=dry_run_sample,
         license_path=f"{args.repo_root}/license.txt",
+        custom_traces_dir=getattr(args, "traces_dir", None),
     )
 
     # ── PLAN ──────────────────────────────────────────────────────────
