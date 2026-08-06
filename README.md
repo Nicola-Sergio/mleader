@@ -6,7 +6,7 @@ Automatically detects hardware resources, checks environment compatibility,
 estimates optimal pipeline parameters from empirical data, and launches
 Nextflow pipelines with a generated configuration profile.
 
-Developed as part of a Master's thesis on adaptive MLOps orchestration
+Developed as part of a Bachelor's thesis on adaptive MLOps orchestration
 for neuroimaging pipelines (FTD — Frontotemporal Dementia).
 
 ---
