@@ -7,6 +7,7 @@ Output: HardwareProfile popolato.
 from .hardware import HardwareProfile, probe_hardware
 from .environment import run_environment_checks
 from .preflight import run_preflight_checks
+from typing import Optional
 
 
 def run_monitor(repo_root: str = ".",
