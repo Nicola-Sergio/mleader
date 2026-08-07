@@ -94,10 +94,11 @@ def test_insufficient_vram_triggers_freesurfer_fallback():
     assert profile.fallbacks.get("brain_segmenter") == "freesurfer"
 
 
-def test_low_ram_generates_warning():
-    profile = _base_profile(ram_available_gb=8.0)
+def test_fastsurfer_ram_requirement_triggers_freesurfer_fallback():
+    profile = _base_profile(ram_available_gb=8.0)  # < 16 GB
     run_preflight_checks(profile)
     assert profile.preflight_passed is True
+    assert profile.fallbacks.get("brain_segmenter") == "freesurfer"
     assert any("RAM" in w for w in profile.preflight_warnings)
 
 
