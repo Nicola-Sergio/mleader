@@ -105,7 +105,7 @@ def test_low_disk_generates_warning():
     profile = _base_profile(disk_free_gb=20.0)
     run_preflight_checks(profile)
     assert profile.preflight_passed is True
-    assert any("disco" in w.lower() for w in profile.preflight_warnings)
+    assert any("disk" in w.lower() for w in profile.preflight_warnings)
 
 
 def test_multiple_critical_errors_all_reported():
