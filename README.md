@@ -33,6 +33,7 @@ Execute   — launches Nextflow with the generated profile and handles
 - Nextflow
 - Docker
 - `psutil`, `jinja2`, `pyyaml` (installed automatically)
+- FreeSurfer License (used for FastSurfer too)
 
 Optional (for GPU support):
 - NVIDIA GPU with compute capability >= 6.0 (Pascal 2016+)
