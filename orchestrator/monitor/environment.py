@@ -111,11 +111,15 @@ def check_containers(
     profile.containers_missing = [c for c in required if c not in available]
 
 
-def run_environment_checks(profile: HardwareProfile, repo_root: str = ".") -> None:
+def run_environment_checks(
+    profile: HardwareProfile,
+    repo_root: str = ".",
+    compose_file: Optional[str] = None,
+) -> None:
     """
     Esegue tutti i check di ambiente e popola il profilo.
     """
     check_nextflow_version(profile)
     check_docker_gpu_runtime(profile)
     check_fs_license(profile, repo_root)
-    check_containers(profile)
+    check_containers(profile, repo_root, compose_file)
