@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project] #project definition
-name = "ftd-orchestrator"
+name = "mleader"
 version = "0.1.0"
 description = "Infrastructure-aware module for adaptive MLOps pipeline orchestration"
 requires-python = ">=3.10"
