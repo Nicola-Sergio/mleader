@@ -1,6 +1,6 @@
 """
-Execute — quarta fase del loop MAPE-K.
-Supervisiona il lifecycle della pipeline con retry adattivo.
+Execute — fourth phase of the MAPE-K loop.
+Supervises the lifecycle of the pipeline with adaptive retry.
 """
 
 from .supervisor import supervise, RunResult
@@ -13,7 +13,7 @@ def run_execute(
     auto: bool = False,
 ) -> RunResult:
     """
-    Esegue la fase Execute: lancia Nextflow e supervisiona.
+    Executes the Execute phase: launches Nextflow and supervises it.
     """
     print(f"[Execute] Pipeline: {pipeline}")
     print(f"[Execute] Config:   {config_path}")
