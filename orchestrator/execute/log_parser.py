@@ -1,7 +1,7 @@
 """
 Log parser — Execute component.
-Legge .nextflow.log e classifica la causa del fallimento
-per decidere la strategia di retry.
+Reads .nextflow.log and classifies the cause of the failure
+to decide the retry strategy.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ class FailureCause(Enum):
     UNKNOWN           = "unknown"
 
 
-# Pattern di testo da cercare nel log per classificare il fallimento
+# Text patterns to match in the log file for each failure cause.
 _PATTERNS: list[tuple[FailureCause, list[str]]] = [
     (FailureCause.OOM_VRAM, [
         "CUDA out of memory",
@@ -64,8 +64,8 @@ _PATTERNS: list[tuple[FailureCause, list[str]]] = [
 
 def classify_failure(log_path: str = ".nextflow.log") -> FailureCause:
     """
-    Legge il log di Nextflow e restituisce la causa del fallimento.
-    Se il log non esiste o non matcha nessun pattern, restituisce UNKNOWN.
+    Reads the Nextflow log and returns the cause of the failure.
+    If the log does not exist or does not match any pattern, returns UNKNOWN.
     """
     path = Path(log_path)
     if not path.exists():
