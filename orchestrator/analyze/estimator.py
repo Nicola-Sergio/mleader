@@ -152,7 +152,7 @@ def estimate_params(
             ram_used   = None
             source     = "hardware_conservative"
 
-        fastsurfer_threads = max(1, profile.cpu_threads // maxforks)
+        fastsurfer_threads = max(2, profile.cpu_threads - 1)
         vram_reported = None
 
     else:
