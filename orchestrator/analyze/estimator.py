@@ -114,7 +114,7 @@ def estimate_params(
             # Best case: empirical VRAM from dry_run
             vram_free = profile.gpu.vram_free_gb
             maxforks  = max(1, math.floor(vram_free * SAFETY_VRAM / vram_per_subject_gb))
-            fastsurfer_threads = max(1, profile.cpu_threads // maxforks)
+            fastsurfer_threads = max(2, profile.cpu_threads - 1)
             ram_used   = vram_per_subject_gb
             source     = "dry_run"
 
@@ -125,7 +125,7 @@ def estimate_params(
                 profile.ram_available_gb * SAFETY_RAM / ram_per_subject_gb_fastsurfer_gpu
             ))
             maxforks  = min(maxforks_ram, cpu_cores_free)
-            fastsurfer_threads = max(1, profile.cpu_threads // maxforks)
+            fastsurfer_threads = max(2, profile.cpu_threads - 1)
             ram_used   = ram_per_subject_gb_fastsurfer_gpu
             source     = "trace_empirical_ram_proxy"
 
