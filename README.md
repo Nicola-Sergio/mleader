@@ -274,7 +274,7 @@ The module performs the following checks before estimating parameters:
 |---|---|
 | Nextflow installed | `nextflow -v` succeeds |
 | FreeSurfer license | `license.txt` present in repo root |
-| Docker containers | all images from `docker-compose.yml` are built |
+| Docker images | all images from `docker-compose.yml` are built |
 
 ### Non-critical (warnings + fallbacks)
 
