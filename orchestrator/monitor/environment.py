@@ -1,6 +1,6 @@
 """
 Environment checker — Monitor component.
-Verifica nextflow version, docker GPU runtime, licenze, container buildati.
+Checks nextflow version, docker GPU runtime, licenses, container buildati.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from .hardware import HardwareProfile
 
 def check_nextflow_version(profile: HardwareProfile) -> None:
     """
-    Rileva la versione di Nextflow installata.
+    Checks the version of Nextflow installed.
     """
     try:
         out = subprocess.check_output(
@@ -31,11 +31,11 @@ def check_nextflow_version(profile: HardwareProfile) -> None:
 
 def check_docker_gpu_runtime(profile: HardwareProfile) -> None:
     """
-    Verifica se nvidia-container-toolkit è installato sull'host.
+    Checks if nvidia-container-toolkit is installed on the host.
 
-    Approccio: which nvidia-container-toolkit. Docker stesso adotta questa
-    strategia internamente (vecchio daemon/nvidia_linux.go).
-    Riferimento: https://github.com/moby/moby/issues/40903
+    Approach: which nvidia-container-toolkit. Docker itself adopts this
+    strategy internally (old daemon/nvidia_linux.go).
+    Reference: https://github.com/moby/moby/issues/40903
     """
     if profile.gpu is None:
         profile.docker_gpu_runtime = False
@@ -56,16 +56,15 @@ def check_docker_gpu_runtime(profile: HardwareProfile) -> None:
 
     if not profile.docker_gpu_runtime:
         print(
-            "[Monitor] nvidia-container-toolkit non trovato nel PATH. "
-            "Installazione: "
-            "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html"
+            "[Monitor] nvidia-container-toolkit not found in PATH. "
+            "Install it to enable GPU support in Docker containers. "
         )
 
 
 def check_fs_license(profile: HardwareProfile, repo_root: str = ".") -> None:
     """
-    Verifica che il file di licenza FreeSurfer (license.txt) sia presente
-    nella root del repo FTD.
+    Checks if the FreeSurfer license file (license.txt) is present
+    in the root of the FTD repository.
     """
     license_path = Path(repo_root) / "license.txt"
     profile.fs_license_present = license_path.exists()
@@ -77,12 +76,12 @@ def check_containers(
     compose_file: Optional[str] = None,
 ) -> None:
     """
-    Verifica quali container Docker richiesti dalla pipeline sono già
-    buildati, leggendo i nomi dal docker-compose file invece di
-    hardcodarli nel modulo.
+    Checks which Docker containers required by the pipeline are already
+    built, reading the names from the docker-compose file instead of
+    hardcoding them in the module.
 
-    Se compose_file è specificato, usa quello. Altrimenti cerca
-    docker-compose.yml e docker-compose.yaml nella root del repo.
+    If compose_file is specified, uses that. Otherwise, looks for
+    docker-compose.yml and docker-compose.yaml in the root of the repo.
     """
     from .pipeline_config import parse_docker_images
 
@@ -90,8 +89,7 @@ def check_containers(
 
     if not required:
         print(
-            "[Monitor] Nessun docker-compose trovato o nessuna immagine "
-            "definita — check container saltato."
+            "[Monitor] No docker-compose found or no images defined — container check skipped."
         )
         profile.containers_built = []
         profile.containers_missing = []
@@ -117,7 +115,7 @@ def run_environment_checks(
     compose_file: Optional[str] = None,
 ) -> None:
     """
-    Esegue tutti i check di ambiente e popola il profilo.
+    Runs all the environment checks and populates the profile.
     """
     check_nextflow_version(profile)
     check_docker_gpu_runtime(profile)

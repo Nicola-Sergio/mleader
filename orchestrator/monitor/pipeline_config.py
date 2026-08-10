@@ -4,12 +4,12 @@ from pathlib import Path
 
 def parse_docker_images(repo_root: str, compose_file: Optional[str] = None) -> list[str]:
     """
-    Legge docker-compose.yml e estrae i nomi delle immagini
-    definite nei servizi, invece di hardcodarli nel modulo.
+    Reads docker-compose.yml and extracts the names of the images
+    defined in the services, instead of hardcoding them in the module.
 
-    Se compose_file è specificato, cerca solo quel file.
-    Altrimenti cerca docker-compose.yml e docker-compose.yaml
-    in ordine, usando il primo trovato.
+    If compose_file is specified, looks for that file only.
+    Otherwise, looks for docker-compose.yml and docker-compose.yaml
+    in order, using the first one found.
 
     """
     if compose_file:

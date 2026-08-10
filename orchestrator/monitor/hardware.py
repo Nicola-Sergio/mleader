@@ -113,7 +113,7 @@ def check_vgpu_license(gpu: GpuInfo) -> None:
 
 def probe_hardware(work_dir: str = ".") -> HardwareProfile:
     """
-    Rileva tutte le risorse hardware dell'host corrente.
+    Relieve hardware resources of the current host.
     """
     # CPU
     cpu_cores = psutil.cpu_count(logical=False) or 1

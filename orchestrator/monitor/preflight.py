@@ -64,17 +64,14 @@ def run_preflight_checks(profile: HardwareProfile) -> None:
     if profile.nextflow_version is None:
         errors.append(
             "Nextflow not found. "
-            "Install Nextflow: https://www.nextflow.io/ "
-            "(recommended version: 24.10.5)"
+            "Please, install Nextflow"
         )
 
     # 2. FreeSurfer license present
     if not profile.fs_license_present:
         errors.append(
             "license.txt not found in repo root. "
-            "Obtain the FreeSurfer license: "
-            "https://surfer.nmr.mgh.harvard.edu/fswiki/License "
-            "and place it as license.txt in the project root."
+            "Obtain the FreeSurfer license and place it as license.txt in the project root."
         )
 
     # 3. Required Docker containers built
@@ -90,10 +87,8 @@ def run_preflight_checks(profile: HardwareProfile) -> None:
     # 5. GPU present but nvidia-container-toolkit not installed
     if profile.gpu is not None and not profile.docker_gpu_runtime:
         warnings.append(
-            "GPU detected but nvidia-container-toolkit is not installed "
-            "(checked via 'which nvidia-container-toolkit'). "
-            "Installation: "
-            "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html "
+            "GPU detected but nvidia-container-toolkit is not installed. "
+            "Please, install it."
             "Fallback: brain_segmenter = freesurfer (CPU)."
         )
         fallbacks["brain_segmenter"] = "freesurfer"
@@ -173,7 +168,6 @@ def run_preflight_checks(profile: HardwareProfile) -> None:
                 f"{FASTSURFER_MIN_RAM_GB} GB RAM, "
                 f"{FASTSURFER_MIN_VRAM_GB} GB VRAM, "
                 f"NVIDIA GPU 2016+ (compute capability >= {FASTSURFER_MIN_COMPUTE_CAP}). "
-                f"Source: https://github.com/Deep-MI/FastSurfer "
                 "Fallback: brain_segmenter = freesurfer (CPU)."
             )
             fallbacks["brain_segmenter"] = "freesurfer"
