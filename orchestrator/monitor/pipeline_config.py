@@ -1,6 +1,7 @@
 import yaml
 from typing import Optional
 from pathlib import Path
+import re
 
 def parse_docker_images(repo_root: str, compose_file: Optional[str] = None) -> list[str]:
     """
