@@ -43,3 +43,31 @@ def parse_docker_images(repo_root: str, compose_file: Optional[str] = None) -> l
             images.append(image)
 
     return images
+
+def parse_pipeline_dsl(
+    repo_root: str,
+    pipeline_file: str = "nextflow/preprocessing.nf",
+) -> Optional[str]:
+    """
+    Reads the DSL version declared in the pipeline file or nextflow.config.
+    Returns "1", "2", or None if not declared.
+    """
+    # check file .nf
+    nf_path = Path(repo_root) / pipeline_file
+    if nf_path.exists():
+        try:
+            content = nf_path.read_text(errors="replace")
+            match = re.search(r"nextflow\.enable\.dsl\s*=\s*([12])", content)
+            if match:
+                return match.group(1)
+        except OSError:
+            pass
+
+    # check in nextflow.config
+    config_content = _read_config_text(repo_root)
+    if config_content:
+        match = re.search(r"nextflow\.enable\.dsl\s*=\s*([12])", config_content)
+        if match:
+            return match.group(1)
+
+    return None
