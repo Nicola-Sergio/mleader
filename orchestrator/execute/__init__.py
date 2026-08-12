@@ -18,4 +18,4 @@ def run_execute(
     """
     print(f"[Execute] Pipeline: {pipeline}")
     print(f"[Execute] Config:   {config_path}")
-    return supervise(pipeline, config_path, auto=auto)
+    return supervise(pipeline, config_path, repo_root, auto=auto)
