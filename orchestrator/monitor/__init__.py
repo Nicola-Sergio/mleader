@@ -10,8 +10,6 @@ from .preflight import run_preflight_checks
 from typing import Optional
 from .pipeline_config import parse_pipeline_dsl
 
-profile.pipeline_dsl = parse_pipeline_dsl(repo_root)
-
 
 def run_monitor(repo_root: str = ".",
                 compose_file: Optional[str] = None) -> HardwareProfile:
@@ -25,6 +23,9 @@ def run_monitor(repo_root: str = ".",
     """
     print("[Monitor] Discovering hardware...")
     profile = probe_hardware(work_dir=repo_root)
+
+    #relieve DSL version from pipeline file
+    profile.pipeline_dsl = parse_pipeline_dsl(repo_root)
 
     print("[Monitor] Checking environment...")
     run_environment_checks(profile, repo_root=repo_root, compose_file=compose_file)
