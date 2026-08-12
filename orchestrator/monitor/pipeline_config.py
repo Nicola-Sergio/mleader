@@ -72,3 +72,12 @@ def parse_pipeline_dsl(
             return match.group(1)
 
     return None
+
+def _read_config_text(repo_root: str, config_rel_path: str = "nextflow/nextflow.config") -> Optional[str]:
+    path = Path(repo_root) / config_rel_path
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(errors="replace")
+    except OSError:
+        return None
