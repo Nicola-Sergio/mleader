@@ -39,8 +39,6 @@ def _build_nextflow_cmd(
         "nextflow", "run", pipeline,
         "-c", config_path,
         "-profile", "adaptive_profile",
-        "-with-trace", "reports/trace.txt",
-        "-with-report", "reports/report.html",
     ]
     if resume:
         cmd.append("-resume")
@@ -79,6 +77,7 @@ def _update_maxforks_in_config(config_path: str, new_value: int) -> None:
 def supervise(
     pipeline: str,
     config_path: str,
+    repo_root: str = ".",
     auto: bool = False,
     extra_args: list[str] = None,
 ) -> RunResult:
@@ -86,7 +85,7 @@ def supervise(
     Launches Nextflow and supervises the lifecycle of the pipeline.
     In case of OOM, reduces maxForks and retries with -resume.
     """
-    Path("reports").mkdir(exist_ok=True)
+    Path(repo_root, "reports").mkdir(exist_ok=True)
     attempts = 0
 
     while attempts <= MAX_RETRIES:
@@ -97,7 +96,7 @@ def supervise(
         print(f"[Execute] Command: {' '.join(cmd)}")
 
         try:
-            proc = subprocess.run(cmd, check=False)
+            proc = subprocess.run(cmd, check=False, cwd=repo_root)
         except FileNotFoundError:
             print("[Execute] ERROR: nextflow not found in PATH")
             return RunResult(success=False, returncode=127, attempts=attempts, failure_cause="nextflow_not_found")
@@ -110,7 +109,7 @@ def supervise(
             return RunResult(success=True, returncode=0, attempts=attempts)
 
         # Classifica il fallimento leggendo .nextflow.log
-        cause = classify_failure(".nextflow.log")
+        cause = classify_failure(str(Path(repo_root) / ".nextflow.log"))
         print(f"[Execute] Failure detected: {cause.value}")
 
         if cause == FailureCause.OOM_VRAM and attempts <= MAX_RETRIES:

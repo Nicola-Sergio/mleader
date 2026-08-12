@@ -206,9 +206,10 @@ def main() -> None:
             sys.exit(0)
 
     result = run_execute(
-        pipeline=args.pipeline,
-        config_path=config_path,
-        auto=args.auto,
+    pipeline=args.pipeline,
+    config_path=config_path,
+    repo_root=args.repo_root,
+    auto=args.auto,
     )
 
     sys.exit(0 if result.success else 1)
