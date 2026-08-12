@@ -11,6 +11,7 @@ def run_execute(
     pipeline: str,
     config_path: str,
     auto: bool = False,
+    repo_root: str = "."
 ) -> RunResult:
     """
     Executes the Execute phase: launches Nextflow and supervises it.
