@@ -20,7 +20,7 @@ dev = [
 ]
 
 [project.scripts] #it creates a Python script under /venv/bin/ with specified name that invokes the orchestrator cli code
-ftd-orchestrator = "orchestrator.cli:main"
+mleader = "orchestrator.cli:main"
 
 
 [tool.setuptools.packages.find]
