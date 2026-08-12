@@ -8,6 +8,9 @@ from .hardware import HardwareProfile, probe_hardware
 from .environment import run_environment_checks
 from .preflight import run_preflight_checks
 from typing import Optional
+from .pipeline_config import parse_pipeline_dsl
+
+profile.pipeline_dsl = parse_pipeline_dsl(repo_root)
 
 
 def run_monitor(repo_root: str = ".",

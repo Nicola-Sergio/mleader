@@ -43,6 +43,7 @@ class HardwareProfile:
 
     # Ambiente (popolato da environment.py)
     nextflow_version: Optional[str] = None
+    pipeline_dsl: Optional[str] = None
     docker_gpu_runtime: bool = False
     fs_license_present: bool = False
     containers_built: list[str] = field(default_factory=list)

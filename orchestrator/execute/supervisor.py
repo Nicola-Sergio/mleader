@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+import os
 
 from .log_parser import classify_failure, FailureCause
 
@@ -78,6 +79,7 @@ def supervise(
     pipeline: str,
     config_path: str,
     repo_root: str = ".",
+    profile = None,
     auto: bool = False,
     extra_args: list[str] = None,
 ) -> RunResult:
@@ -96,6 +98,10 @@ def supervise(
         print(f"[Execute] Command: {' '.join(cmd)}")
 
         try:
+          env = os.environ.copy()
+          if profile and getattr(profile, 'pipeline_dsl', None) == "1":
+            env["NXF_SYNTAX_PARSER"] = "v1"
+            print("[Execute] DSL1 detected — setting NXF_SYNTAX_PARSER=v1 automatically")
             proc = subprocess.run(cmd, check=False, cwd=repo_root)
         except FileNotFoundError:
             print("[Execute] ERROR: nextflow not found in PATH")

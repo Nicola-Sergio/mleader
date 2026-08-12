@@ -209,6 +209,7 @@ def main() -> None:
     pipeline=args.pipeline,
     config_path=config_path,
     repo_root=args.repo_root,
+    profile=profile,
     auto=args.auto,
     )
 
