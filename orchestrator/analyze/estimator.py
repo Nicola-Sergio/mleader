@@ -190,7 +190,7 @@ def estimate_params(
         vram_reported      = None
 
     # ── pyradiomics_jobs ──────────────────────────────────────────────
-    pyradiomics_jobs = max(1, profile.cpu_threads - 1)
+    pyradiomics_jobs = max(1, cpu_cores_free - 1)
 
     return ExecutionPlan(
         brain_segmenter    = brain_segmenter,
