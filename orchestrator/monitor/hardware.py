@@ -30,7 +30,6 @@ class HardwareProfile:
     cpu_cores: int
     cpu_threads: int
     cpu_load_percent: float
-    cpu_load_1min: float = 0.0
 
     # RAM
     ram_total_gb: float
@@ -41,6 +40,7 @@ class HardwareProfile:
 
     # GPU (None se assente o non rilevabile)
     gpu: Optional[GpuInfo] = None
+    cpu_load_1min: float = 0.0
 
     # Ambiente (popolato da environment.py)
     nextflow_version: Optional[str] = None
