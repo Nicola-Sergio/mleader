@@ -30,6 +30,7 @@ class HardwareProfile:
     cpu_cores: int
     cpu_threads: int
     cpu_load_percent: float
+    cpu_load_1min: float = 0.0
 
     # RAM
     ram_total_gb: float
@@ -117,6 +118,7 @@ def probe_hardware(work_dir: str = ".") -> HardwareProfile:
     Relieve hardware resources of the current host.
     """
     # CPU
+    load_1min = psutil.getloadavg()[0]
     cpu_cores = psutil.cpu_count(logical=False) or 1
     cpu_threads = psutil.cpu_count(logical=True) or 1
     cpu_load = psutil.cpu_percent(interval=1)
@@ -146,4 +148,5 @@ def probe_hardware(work_dir: str = ".") -> HardwareProfile:
         ram_available_gb=ram_available_gb,
         disk_free_gb=disk_free_gb,
         gpu=gpu,
+        cpu_load_1min = load_1min,
     )
