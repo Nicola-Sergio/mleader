@@ -210,6 +210,7 @@ def main() -> None:
     config_path=config_path,
     repo_root=args.repo_root,
     profile=profile,
+    pipeline_type=getattr(args, "pipeline_type", "preprocessing"),
     auto=args.auto,
     )
 

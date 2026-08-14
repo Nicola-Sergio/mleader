@@ -33,6 +33,7 @@ class RunResult:
 def _build_nextflow_cmd(
     pipeline: str,
     config_path: str,
+    pipeline_type: str = "preprocessing",
     resume: bool = True,
     extra_args: list[str] = None,
 ) -> list[str]:
@@ -80,6 +81,7 @@ def supervise(
     config_path: str,
     repo_root: str = ".",
     profile = None,
+    pipeline_type: str = "preprocessing",
     auto: bool = False,
     extra_args: list[str] = None,
 ) -> RunResult:
