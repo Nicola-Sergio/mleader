@@ -1,6 +1,6 @@
 """
 CLI entry point — ftd-orchestrator.
-Coordina il loop MAPE-K completo.
+Orchestrates the entire MAPE-K loop.
 """
 
 from __future__ import annotations
@@ -15,50 +15,50 @@ from .execute import run_execute
 
 
 def _print_summary(profile, plan, config_path: str) -> None:
-    """Stampa un riepilogo human-readable prima del lancio."""
+    """Prints a human-readable summary before launching."""
     print("\n" + "=" * 60)
-    print("  RIEPILOGO CONFIGURAZIONE ADATTIVA")
+    print("  Summary of Adaptive Configuration")
     print("=" * 60)
 
-    print(f"\n  Host:              {profile.cpu_cores} core fisici, {profile.cpu_threads} thread")
-    print(f"  RAM disponibile:   {profile.ram_available_gb:.1f} GB")
+    print(f"\n  Host:              {profile.cpu_cores} physical cores, {profile.cpu_threads} threads")
+    print(f"  Available RAM:     {profile.ram_available_gb:.1f} GB")
 
     if profile.gpu:
         print(f"  GPU:               {profile.gpu.name}")
-        print(f"  VRAM disponibile:  {profile.gpu.vram_free_gb:.1f} GB")
+        print(f"  Available VRAM:    {profile.gpu.vram_free_gb:.1f} GB")
         print(f"  Docker GPU:        {'✓' if profile.docker_gpu_runtime else '✗'}")
     else:
-        print("  GPU:               non disponibile")
+        print("  GPU:               not available")
 
-    print(f"\n  Segmentatore:      {plan.brain_segmenter}", end="")
+    print(f"\n  Segmentator:       {plan.brain_segmenter}", end="")
     if plan.fastsurfer_device:
         print(f" ({plan.fastsurfer_device})", end="")
     print()
 
-    print(f"  maxForks:          {plan.maxforks_segmenter} soggetti in parallelo")
+    print(f"  maxForks:          {plan.maxforks_segmenter} parallel subjects")
     if plan.fastsurfer_threads:
-        print(f"  fastsurfer_threads:{plan.fastsurfer_threads} thread per istanza")
-    print(f"  pyradiomics_jobs:  {plan.pyradiomics_jobs} job paralleli")
-    print(f"  Fonte parametri:   {plan.source}")
+        print(f"  fastsurfer_threads:{plan.fastsurfer_threads} threads per instance")
+    print(f"  pyradiomics_jobs:  {plan.pyradiomics_jobs} parallel jobs")
+    print(f"  Parameter Source:   {plan.source}")
 
     if profile.preflight_warnings:
-        print("\n  AVVISI:")
+        print("\n  WARNINGS:")
         for w in profile.preflight_warnings:
             print(f"  ⚠  {w}")
 
     if profile.fallbacks:
-        print("\n  FALLBACK APPLICATI:")
+        print("\n  FALLBACKS APPLIED:")
         for k, v in profile.fallbacks.items():
             print(f"  →  {k} = {v}")
 
-    print(f"\n  Config generato:   {config_path}")
+    print(f"\n  Config generated:   {config_path}")
     print("=" * 60 + "\n")
 
 
 def _confirm_launch(pipeline: str) -> bool:
-    """Chiede conferma all'utente prima di lanciare."""
+    """Ask the user for confirmation before launching."""
     try:
-        answer = input(f"Lanciare '{pipeline}' con il profilo adattivo? [y/N] ").strip().lower()
+        answer = input(f"Launch '{pipeline}' with the adaptive profile? [y/N] ").strip().lower()
         return answer == "y"
     except (EOFError, KeyboardInterrupt):
         return False
@@ -74,41 +74,77 @@ def main() -> None:
     # ── Comando: run ──────────────────────────────────────────────────
     run_parser = subparsers.add_parser(
         "run",
-        help="Esegue il loop MAPE-K completo e lancia la pipeline",
+        help="Executes the complete MAPE-K loop and launches the pipeline",
     )
     run_parser.add_argument(
         "--pipeline",
         required=True,
-        help="Path al file .nf da lanciare (es. nextflow/preprocessing.nf)",
+        help="Path to the .nf file to launch (e.g., nextflow/preprocessing.nf)",
     )
     run_parser.add_argument(
         "--repo-root",
         default=".",
-        help="Root del repo FTD (default: directory corrente)",
+        help="Root of the FTD repo (default: current directory)",
     )
     run_parser.add_argument(
         "--output-config",
         default="adaptive_profile.config",
-        help="Path dove scrivere il config generato",
+        help="Path where to write the generated config",
     )
     run_parser.add_argument(
         "--auto",
         action="store_true",
-        help="Lancia la pipeline senza chiedere conferma",
+        help="Launch the pipeline without asking for confirmation",
     )
     run_parser.add_argument(
         "--dry-run-sample",
         default=None,
-        help="Path al file .nii campione per il profiling VRAM (opzionale)",
+        help="Path to a sample .nii file for VRAM profiling via dry-run (optional)",
     )
+    run_parser.add_argument(
+        "--traces-dir",
+        default=None,
+        help="Custom directory containing trace TSV files "
+             "(default: <repo-root>/reports/traces/<pipeline>/)",
+    )
+    run_parser.add_argument(
+        "--pipeline-type",
+        default="preprocessing",
+        choices=["preprocessing", "training"],
+        help="Pipeline type — determines which trace folder to read (default: preprocessing)",
+    )
+    run_parser.add_argument(
+    "--compose-file",
+    default=None,
+    help="Docker-compose file name (default: searching for docker-compose.yml "
+         "oe docker-compose.yaml in the repo root)",
+)
 
     # ── Comando: check ────────────────────────────────────────────────
     check_parser = subparsers.add_parser(
         "check",
-        help="Esegue solo Monitor + Analyze e mostra il riepilogo senza lanciare",
+        help="Executes only Monitor + Analyze and shows the summary without launching",
     )
     check_parser.add_argument("--repo-root", default=".")
     check_parser.add_argument("--output-config", default="adaptive_profile.config")
+    check_parser.add_argument(
+        "--compose-file",
+        default=None,
+        help="Docker-compose file name (default: searching for docker-compose.yml "
+            "oe docker-compose.yaml in the repo root)",
+    )
+    check_parser.add_argument(
+        "--traces-dir",
+        default=None,
+        help="Custom directory containing trace TSV files "
+             "(default: <repo-root>/reports/traces/<pipeline>/)",
+    )
+    check_parser.add_argument(
+        "--pipeline-type",
+        default="preprocessing",
+        choices=["preprocessing", "training"],
+        help="Pipeline type — determines which trace folder to read (default: preprocessing)",
+    )
 
     args = parser.parse_args()
 
@@ -120,20 +156,23 @@ def main() -> None:
     from pathlib import Path
     repo_root_path = Path(args.repo_root).resolve()
     if not repo_root_path.exists():
-        print(f"\n[ERRORE] Il path specificato non esiste: {repo_root_path}")
-        print("Verifica il valore di --repo-root e riprova.")
+        print(f"\n[ERRORE] The specified path does not exist: {repo_root_path}")
+        print("Verify the value of --repo-root and try again.")
         sys.exit(1)
     if not repo_root_path.is_dir():
-        print(f"\n[ERRORE] Il path specificato non è una directory: {repo_root_path}")
+        print(f"\n[ERRORE] The specified path is not a directory: {repo_root_path}")
         sys.exit(1)
     # Normalizza args.repo_root al path assoluto risolto
     args.repo_root = str(repo_root_path)
 
     # ── MONITOR ───────────────────────────────────────────────────────
-    profile = run_monitor(repo_root=args.repo_root)
+    profile = run_monitor(
+        repo_root=args.repo_root,
+        compose_file=getattr(args, "compose_file", None)
+        )
 
     if not profile.preflight_passed:
-        print("\n[ERRORE] Preflight check falliti — impossibile procedere:\n")
+        print("\n[ERRORE] Failed preflight checks — Unable to proceed:\n")
         for err in profile.preflight_errors:
             print(f"  ✗  {err}\n")
         sys.exit(1)
@@ -142,9 +181,12 @@ def main() -> None:
     dry_run_sample = getattr(args, "dry_run_sample", None)
     plan = run_analyze(
         profile,
+        repo_root=args.repo_root,
+        pipeline=getattr(args, "pipeline_type", "preprocessing"),
         dry_run=bool(dry_run_sample),
         sample_nii=dry_run_sample,
         license_path=f"{args.repo_root}/license.txt",
+        custom_traces_dir=getattr(args, "traces_dir", None),
     )
 
     # ── PLAN ──────────────────────────────────────────────────────────
@@ -154,19 +196,22 @@ def main() -> None:
     _print_summary(profile, plan, config_path)
 
     if args.command == "check":
-        print("[check] Solo analisi richiesta — pipeline non lanciata.")
+        print("[check] Only analysis requested — pipeline not launched.")
         sys.exit(0)
 
     # ── EXECUTE ───────────────────────────────────────────────────────
     if not args.auto:
         if not _confirm_launch(args.pipeline):
-            print("Lancio annullato.")
+            print("Launch cancelled.")
             sys.exit(0)
 
     result = run_execute(
-        pipeline=args.pipeline,
-        config_path=config_path,
-        auto=args.auto,
+    pipeline=args.pipeline,
+    config_path=config_path,
+    repo_root=args.repo_root,
+    profile=profile,
+    pipeline_type=getattr(args, "pipeline_type", "preprocessing"),
+    auto=args.auto,
     )
 
     sys.exit(0 if result.success else 1)

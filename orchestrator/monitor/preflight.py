@@ -1,24 +1,44 @@
 """
 Preflight checks — Monitor component.
-Verifica i vincoli critici e non critici prima del lancio della pipeline.
-Vincoli critici: bloccano il lancio.
-Vincoli non critici: generano warning e attivano fallback.
+Checks critical and non-critical constraints before launching the pipeline.
+Critical constraints: block the launch.
+Non-critical constraints: generate warnings and activate fallbacks.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from .hardware import HardwareProfile
 
 
-# Versione minima di Nextflow supportata (DSL1 compatibile)
-NEXTFLOW_MIN_VERSION = (22, 0, 0)
+# ── FastSurfer official system requirements ───────────────────────────────────
+# Source: https://github.com/Deep-MI/FastSurfer
+# Intel or AMD CPU (6 or more cores)
+# 16 GB system memory
+# NVIDIA GPU (2016 or newer = compute capability >= 6.0 / Pascal architecture)
+# 12 GB graphics memory
+FASTSURFER_MIN_CORES        = 6
+FASTSURFER_MIN_RAM_GB       = 16.0
+FASTSURFER_MIN_VRAM_GB      = 12.0
+FASTSURFER_MIN_COMPUTE_CAP  = 6.0   # Pascal (2016) and newer
 
-# VRAM minima per lanciare fastsurfer su GPU con almeno 1 soggetto
-FASTSURFER_MIN_VRAM_GB = 6.0
+# Minimum free disk space recommended for preprocessing pipeline
+DISK_MIN_FREE_GB = 50.0
+
+# Known output directories produced by previous pipeline runs
+# Used to provide actionable hints when disk space is low
+KNOWN_OUTPUT_DIRS = [
+    "data/interim/freesurfer_segmentation",
+    "data/interim/fastsurfer_segmentation",
+    "data/interim/features-freesurfer",
+    "data/interim/features-fastsurfer",
+    ".nextflow/runningfiles",
+]
 
 
 def _parse_version(version_str: str) -> tuple[int, ...]:
-    """Converte stringa versione in tupla di interi per confronto."""
+    """Converts a version string to a tuple of integers for comparison."""
     try:
         parts = version_str.split(".")
         return tuple(int(p) for p in parts[:3])
@@ -28,62 +48,53 @@ def _parse_version(version_str: str) -> tuple[int, ...]:
 
 def run_preflight_checks(profile: HardwareProfile) -> None:
     """
-    Esegue tutti i preflight check e popola:
-    - profile.preflight_errors   (critici — bloccano il lancio)
-    - profile.preflight_warnings (non critici — attivano fallback)
-    - profile.fallbacks          (decisioni di fallback applicate)
-    - profile.preflight_passed   (True se nessun errore critico)
+    Runs all preflight checks and populates:
+    - profile.preflight_errors   (critical — block the launch)
+    - profile.preflight_warnings (non-critical — activate fallbacks)
+    - profile.fallbacks          (fallback decisions applied)
+    - profile.preflight_passed   (True if no critical errors)
     """
     errors = []
     warnings = []
     fallbacks = {}
 
-    # ── VINCOLI CRITICI ──────────────────────────────────────────────
+    # ── CRITICAL CONSTRAINTS ─────────────────────────────────────────
 
-    # 1. Nextflow installato
+    # 1. Nextflow installed
     if profile.nextflow_version is None:
         errors.append(
-            "Nextflow non trovato. "
-            "Installa Nextflow: https://www.nextflow.io/ "
-            "(versione raccomandata: 24.10.5)"
+            "Nextflow not found. "
+            "Please, install Nextflow"
         )
 
-    # 2. Licenza FreeSurfer presente
+    # 2. FreeSurfer license present
     if not profile.fs_license_present:
         errors.append(
-            "File license.txt non trovato nella root del repo. "
-            "Ottieni la licenza FreeSurfer: "
-            "https://surfer.nmr.mgh.harvard.edu/fswiki/License "
-            "e posizionala come license.txt nella root del progetto."
+            "license.txt not found in repo root. "
+            "Obtain the FreeSurfer license and place it as license.txt in the project root."
         )
 
-    # 3. Container obbligatori buildati
+    # 3. Required Docker containers built
     if profile.containers_missing:
         missing_str = ", ".join(profile.containers_missing)
         errors.append(
-            f"Container Docker mancanti: {missing_str}. "
-            "Esegui 'docker compose build' nella root del repo FTD."
+            f"Missing Docker containers: {missing_str}. "
+            "Run 'docker compose build' in the FTD repo root."
         )
 
-    # 4. Docker disponibile (check indiretto: se containers_missing è popolato
-    #    significa che docker è raggiungibile; se è vuoto ed è andato in errore
-    #    è già gestito sopra)
+    # ── NON-CRITICAL CONSTRAINTS (fallbacks) ─────────────────────────
 
-    # ── VINCOLI NON CRITICI (fallback) ───────────────────────────────
-
-    # 5. GPU disponibile ma nvidia-container-toolkit non installato
+    # 5. GPU present but nvidia-container-toolkit not installed
     if profile.gpu is not None and not profile.docker_gpu_runtime:
         warnings.append(
-            "GPU rilevata ma nvidia-container-toolkit non è installato "
-            "(verificato con 'which nvidia-container-toolkit'). "
-            "Installazione: "
-            "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html "
+            "GPU detected but nvidia-container-toolkit is not installed. "
+            "Please, install it."
             "Fallback: brain_segmenter = freesurfer (CPU)."
         )
         fallbacks["brain_segmenter"] = "freesurfer"
         fallbacks["fastsurfer_device"] = None
 
-    # 5b. GPU disponibile, toolkit installato, ma licenza vGPU mancante/scaduta
+    # 5b. GPU present, toolkit installed, but vGPU license missing/expired
     if (
         profile.gpu is not None
         and profile.docker_gpu_runtime
@@ -92,52 +103,104 @@ def run_preflight_checks(profile: HardwareProfile) -> None:
         and "unlicensed" in profile.gpu.vgpu_license_status.lower()
     ):
         warnings.append(
-            f"GPU virtualizzata (vGPU) rilevata ma non licenziata "
+            f"Virtualized GPU (vGPU) detected but unlicensed "
             f"(License Status: {profile.gpu.vgpu_license_status}). "
-            "Senza licenza valida i container con accesso GPU falliranno "
-            "a runtime con errori opachi. Verifica configurazione del "
-            "license server o valuta il passaggio a MIG passthrough. "
+            "Without a valid license, GPU-enabled containers will fail at runtime "
+            "with opaque errors. Check license server configuration or consider "
+            "switching to MIG passthrough. "
             "Fallback: brain_segmenter = freesurfer (CPU)."
         )
         fallbacks["brain_segmenter"] = "freesurfer"
         fallbacks["fastsurfer_device"] = None
 
-    # 6. GPU assente — nessun errore, solo fallback silenzioso
+    # 6. GPU absent — silent fallback, no warning needed
     if profile.gpu is None:
         fallbacks["brain_segmenter"] = "freesurfer"
         fallbacks["fastsurfer_device"] = None
 
-    # 7. VRAM disponibile insufficiente per fastsurfer
+    # 7. FastSurfer official system requirements check
+    # Only evaluated if GPU is present, toolkit is available,
+    # and no fallback has already been registered (checks 5, 5b, 6).
     if (
         profile.gpu is not None
         and profile.docker_gpu_runtime
-        and profile.gpu.vram_free_gb < FASTSURFER_MIN_VRAM_GB
+        and "brain_segmenter" not in fallbacks
     ):
-        warnings.append(
-            f"VRAM disponibile ({profile.gpu.vram_free_gb:.1f}GB) "
-            f"inferiore al minimo richiesto da FastSurfer ({FASTSURFER_MIN_VRAM_GB}GB). "
-            "Fallback: brain_segmenter = freesurfer (CPU)."
-        )
-        fallbacks["brain_segmenter"] = "freesurfer"
-        fallbacks["fastsurfer_device"] = None
+        fastsurfer_issues = []
 
-    # 8. RAM disponibile bassa
-    if profile.ram_available_gb < 16.0:
-        warnings.append(
-            f"RAM disponibile bassa ({profile.ram_available_gb:.1f}GB). "
-            "maxForks verrà impostato conservativamente."
-        )
+        # 7a. VRAM >= 12 GB
+        if profile.gpu.vram_free_gb < FASTSURFER_MIN_VRAM_GB:
+            fastsurfer_issues.append(
+                f"VRAM available ({profile.gpu.vram_free_gb:.1f} GB) "
+                f"below FastSurfer minimum ({FASTSURFER_MIN_VRAM_GB} GB)"
+            )
 
-    # 9. Spazio disco basso sul workDir
-    if profile.disk_free_gb < 50.0:
-        warnings.append(
-            f"Spazio disco disponibile basso ({profile.disk_free_gb:.1f}GB). "
-            "La pipeline di preprocessing produce dati volumetrici pesanti. "
-            "Si raccomandano almeno 50GB liberi."
-        )
+        # 7b. System RAM >= 16 GB
+        if profile.ram_available_gb < FASTSURFER_MIN_RAM_GB:
+            fastsurfer_issues.append(
+                f"System RAM available ({profile.ram_available_gb:.1f} GB) "
+                f"below FastSurfer minimum ({FASTSURFER_MIN_RAM_GB} GB)"
+            )
 
-    # ── RISULTATO FINALE ─────────────────────────────────────────────
-    profile.preflight_errors = errors
+        # 7c. CPU cores >= 6
+        if profile.cpu_cores < FASTSURFER_MIN_CORES:
+            fastsurfer_issues.append(
+                f"CPU cores ({profile.cpu_cores}) "
+                f"below FastSurfer minimum ({FASTSURFER_MIN_CORES})"
+            )
+
+        # 7d. GPU compute capability >= 6.0 (NVIDIA Pascal 2016+)
+        try:
+            cc = float(profile.gpu.compute_capability)
+            if cc < FASTSURFER_MIN_COMPUTE_CAP:
+                fastsurfer_issues.append(
+                    f"GPU compute capability ({cc}) "
+                    f"below FastSurfer minimum ({FASTSURFER_MIN_COMPUTE_CAP} — NVIDIA 2016+)"
+                )
+        except (ValueError, TypeError):
+            pass  # compute_capability not available — skip check
+
+        if fastsurfer_issues:
+            issues_str = "; ".join(fastsurfer_issues)
+            warnings.append(
+                f"FastSurfer official requirements not met: {issues_str}. "
+                f"Official requirements: {FASTSURFER_MIN_CORES}+ CPU cores, "
+                f"{FASTSURFER_MIN_RAM_GB} GB RAM, "
+                f"{FASTSURFER_MIN_VRAM_GB} GB VRAM, "
+                f"NVIDIA GPU 2016+ (compute capability >= {FASTSURFER_MIN_COMPUTE_CAP}). "
+                "Fallback: brain_segmenter = freesurfer (CPU)."
+            )
+            fallbacks["brain_segmenter"] = "freesurfer"
+            fallbacks["fastsurfer_device"] = None
+
+    # 8. Low disk space — check if previous pipeline output is consuming space
+    # profile.repo_root is set by the Monitor via probe_hardware(work_dir=repo_root)
+    if profile.disk_free_gb < DISK_MIN_FREE_GB:
+        repo_root = getattr(profile, 'repo_root', '.')
+        existing = [
+            str(Path(repo_root) / d)
+            for d in KNOWN_OUTPUT_DIRS
+            if (Path(repo_root) / d).exists()
+        ]
+
+        if existing:
+            dirs_str = "\n    ".join(existing)
+            warnings.append(
+                f"Low disk space ({profile.disk_free_gb:.1f} GB available). "
+                f"The following pipeline output directories were found and "
+                f"may be consuming significant space:\n    {dirs_str}\n"
+                "Consider removing them if no longer needed "
+                "(preprocessing will need to be re-run if segmentation is deleted)."
+            )
+        else:
+            warnings.append(
+                f"Low disk space ({profile.disk_free_gb:.1f} GB available). "
+                "The preprocessing pipeline produces heavy volumetric data. "
+                f"At least {DISK_MIN_FREE_GB:.0f} GB free is recommended."
+            )
+
+    # ── FINAL RESULT ─────────────────────────────────────────────────
+    profile.preflight_errors   = errors
     profile.preflight_warnings = warnings
-    profile.fallbacks = fallbacks
-    profile.preflight_passed = len(errors) == 0
+    profile.fallbacks          = fallbacks
+    profile.preflight_passed   = len(errors) == 0

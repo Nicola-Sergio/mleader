@@ -40,9 +40,11 @@ class HardwareProfile:
 
     # GPU (None se assente o non rilevabile)
     gpu: Optional[GpuInfo] = None
+    cpu_load_1min: float = 0.0
 
     # Ambiente (popolato da environment.py)
     nextflow_version: Optional[str] = None
+    pipeline_dsl: Optional[str] = None
     docker_gpu_runtime: bool = False
     fs_license_present: bool = False
     containers_built: list[str] = field(default_factory=list)
@@ -113,9 +115,10 @@ def check_vgpu_license(gpu: GpuInfo) -> None:
 
 def probe_hardware(work_dir: str = ".") -> HardwareProfile:
     """
-    Rileva tutte le risorse hardware dell'host corrente.
+    Relieve hardware resources of the current host.
     """
     # CPU
+    load_1min = psutil.getloadavg()[0]
     cpu_cores = psutil.cpu_count(logical=False) or 1
     cpu_threads = psutil.cpu_count(logical=True) or 1
     cpu_load = psutil.cpu_percent(interval=1)
@@ -145,4 +148,5 @@ def probe_hardware(work_dir: str = ".") -> HardwareProfile:
         ram_available_gb=ram_available_gb,
         disk_free_gb=disk_free_gb,
         gpu=gpu,
+        cpu_load_1min = load_1min,
     )

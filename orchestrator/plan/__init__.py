@@ -1,6 +1,6 @@
 """
-Plan — terza fase del loop MAPE-K.
-Genera il file adaptive_profile.config.
+Plan — third phase of the MAPE-K loop.
+Generates the adaptive_profile.config file.
 """
 
 from .config_generator import generate_config
@@ -8,9 +8,9 @@ from .config_generator import generate_config
 
 def run_plan(plan, profile, output_path: str = "adaptive_profile.config") -> str:
     """
-    Esegue la fase Plan: genera adaptive_profile.config.
-    Restituisce il path del file generato.
+    Executes the Plan phase: generates adaptive_profile.config.
+    Returns the path of the generated file.
     """
-    print("[Plan] Generazione configurazione adattiva...")
+    print("[Plan] Generating adaptive configuration...")
     config_path = generate_config(plan, profile, output_path)
     return config_path
