@@ -52,13 +52,8 @@ class TestFreesurferSelection:
     """Tests that freesurfer is selected when GPU is not available."""
 
     def test_no_gpu_selects_freesurfer(self):
-        """
-        When no GPU is present, the module must select freesurfer.
-        The preflight registers the fallback, estimator reads it.
-        """
         profile = _make_profile(gpu=None, docker_gpu_runtime=False)
         run_preflight_checks(profile)
-
         plan = estimate_params(profile)
 
         assert plan.brain_segmenter == "freesurfer"
@@ -66,10 +61,6 @@ class TestFreesurferSelection:
         assert plan.fastsurfer_threads is None
 
     def test_gpu_present_but_toolkit_missing_selects_freesurfer(self):
-        """
-        When GPU is present but nvidia-container-toolkit is missing,
-        docker_gpu_runtime=False and the module must fall back to freesurfer.
-        """
         gpu = GpuInfo(
             name="NVIDIA H200-35C",
             vram_total_gb=35.0,
@@ -79,17 +70,12 @@ class TestFreesurferSelection:
         )
         profile = _make_profile(gpu=gpu, docker_gpu_runtime=False)
         run_preflight_checks(profile)
-
         plan = estimate_params(profile)
 
         assert plan.brain_segmenter == "freesurfer"
         assert plan.fastsurfer_device is None
 
     def test_gpu_present_but_vram_insufficient_selects_freesurfer(self):
-        """
-        When GPU VRAM is below FastSurfer minimum (12 GB),
-        preflight registers fallback and module selects freesurfer.
-        """
         gpu = GpuInfo(
             name="NVIDIA GTX 1060",
             vram_total_gb=6.0,
@@ -99,30 +85,35 @@ class TestFreesurferSelection:
         )
         profile = _make_profile(gpu=gpu, docker_gpu_runtime=True)
         run_preflight_checks(profile)
-
         plan = estimate_params(profile)
 
         assert plan.brain_segmenter == "freesurfer"
         assert plan.fastsurfer_device is None
 
     def test_gpu_present_but_compute_capability_too_low_selects_freesurfer(self):
-        """
-        When GPU compute capability < 6.0 (pre-2016 GPU),
-        FastSurfer requirements not met → freesurfer fallback.
-        """
         gpu = GpuInfo(
             name="NVIDIA GTX 980",
             vram_total_gb=4.0,
             vram_free_gb=3.8,
             driver_version="470.0",
-            compute_capability="5.2",  # Maxwell, pre-2016
+            compute_capability="5.2",
         )
         profile = _make_profile(gpu=gpu, docker_gpu_runtime=True)
         run_preflight_checks(profile)
-
         plan = estimate_params(profile)
 
         assert plan.brain_segmenter == "freesurfer"
+
+    def test_no_gpu_fastsurfer_maxforks_is_zero(self):
+        """
+        When no GPU is available, maxforks_fastsurfer must be 0
+        to signal that FastSurfer cannot be used.
+        """
+        profile = _make_profile(gpu=None, docker_gpu_runtime=False)
+        run_preflight_checks(profile)
+        plan = estimate_params(profile)
+
+        assert plan.maxforks_fastsurfer == 0
 
 
 # ── Test: maxForks calculation for freesurfer ─────────────────────────────────
@@ -133,7 +124,8 @@ class TestFreesurferMaxForks:
     def test_maxforks_empirical_from_trace(self):
         """
         When empirical peak_rss is available from trace files,
-        maxForks = min(floor(ram_available * 0.80 / peak_rss), cpu_cores_free).
+        maxForks = min(floor(ram_available / peak_rss), cpu_cores_free).
+        No safety factor is applied — observed max is already worst-case.
         """
         profile = _make_profile(
             gpu=None,
@@ -142,23 +134,19 @@ class TestFreesurferMaxForks:
             fallbacks={"brain_segmenter": "freesurfer"},
         )
 
-        # empirical peak_rss from trace: 2.2 GB (max observed on 226 subjects)
         peak_rss = 2.2
         plan = estimate_params(profile, ram_per_subject_gb_freesurfer=peak_rss)
 
-        expected_ram  = math.floor(65.5 * 0.80 / peak_rss)  # = 23
-        expected_cpu  = 32  # cpu_cores_free ≈ cpu_cores when load is low
-        expected_max  = min(expected_ram, expected_cpu)
+        expected = min(math.floor(65.5 / peak_rss), 32)
 
         assert plan.brain_segmenter == "freesurfer"
-        assert plan.maxforks_segmenter == expected_max
+        assert plan.maxforks_freesurfer == expected
         assert plan.source == "trace_empirical"
 
     def test_maxforks_conservative_fallback_no_trace_data(self):
         """
         When no empirical data is available (cold start),
         maxForks = cpu_cores_free (hardware-conservative fallback).
-        FreeSurfer is single-threaded: 1 core per subject is always safe.
         """
         profile = _make_profile(
             gpu=None,
@@ -167,30 +155,28 @@ class TestFreesurferMaxForks:
             fallbacks={"brain_segmenter": "freesurfer"},
         )
 
-        plan = estimate_params(profile)  # no peak_rss provided
+        plan = estimate_params(profile)
 
         assert plan.brain_segmenter == "freesurfer"
-        assert plan.maxforks_segmenter == plan.cpu_cores_free
+        assert plan.maxforks_freesurfer == plan.cpu_cores_free
         assert plan.source == "hardware_conservative"
 
     def test_maxforks_capped_by_cpu_cores(self):
         """
         When RAM would allow more parallelism than available CPU cores,
         maxForks is capped at cpu_cores_free.
-        FreeSurfer is single-threaded: no benefit beyond available cores.
         """
         profile = _make_profile(
             gpu=None,
-            cpu_cores=4,          # only 4 cores
+            cpu_cores=4,
             cpu_threads=4,
-            ram_available_gb=512.0,  # plenty of RAM
+            ram_available_gb=512.0,
             fallbacks={"brain_segmenter": "freesurfer"},
         )
 
         plan = estimate_params(profile, ram_per_subject_gb_freesurfer=2.2)
 
-        # RAM would allow floor(512 * 0.80 / 2.2) = 186 → capped at 4
-        assert plan.maxforks_segmenter <= 4
+        assert plan.maxforks_freesurfer <= 4
         assert plan.brain_segmenter == "freesurfer"
 
     def test_maxforks_capped_by_ram(self):
@@ -201,24 +187,23 @@ class TestFreesurferMaxForks:
             gpu=None,
             cpu_cores=64,
             cpu_threads=64,
-            ram_available_gb=10.0,   # very limited RAM
+            ram_available_gb=10.0,
             fallbacks={"brain_segmenter": "freesurfer"},
         )
 
         plan = estimate_params(profile, ram_per_subject_gb_freesurfer=2.2)
 
-        # RAM allows floor(10.0 * 0.80 / 2.2) = 3
-        # CPU would allow 64 → RAM is bottleneck
-        assert plan.maxforks_segmenter == math.floor(10.0 * 0.80 / 2.2)
+        assert plan.maxforks_freesurfer == math.floor(10.0 / 2.2)
         assert plan.brain_segmenter == "freesurfer"
 
-    def test_pyradiomics_jobs_always_cpu_threads_minus_one(self):
+    def test_pyradiomics_jobs_based_on_cpu_cores_free(self):
         """
-        pyradiomics_jobs is always cpu_threads - 1, regardless of
-        which segmenter is selected or whether trace data is available.
+        pyradiomics_jobs = max(1, cpu_cores_free - 1).
+        With low load and 32 cores, cpu_cores_free = 32, jobs = 31.
         """
         profile = _make_profile(
             gpu=None,
+            cpu_cores=32,
             cpu_threads=32,
             fallbacks={"brain_segmenter": "freesurfer"},
         )
@@ -241,4 +226,21 @@ class TestFreesurferMaxForks:
 
         plan = estimate_params(profile, ram_per_subject_gb_freesurfer=2.2)
 
-        assert plan.maxforks_segmenter >= 1
+        assert plan.maxforks_freesurfer >= 1
+
+    def test_both_maxforks_always_computed(self):
+        """
+        Both maxforks_freesurfer and maxforks_fastsurfer are always present
+        in the ExecutionPlan, regardless of which segmenter is selected.
+        """
+        profile = _make_profile(
+            gpu=None,
+            fallbacks={"brain_segmenter": "freesurfer"},
+        )
+
+        plan = estimate_params(profile)
+
+        assert hasattr(plan, "maxforks_freesurfer")
+        assert hasattr(plan, "maxforks_fastsurfer")
+        assert isinstance(plan.maxforks_freesurfer, int)
+        assert isinstance(plan.maxforks_fastsurfer, int)

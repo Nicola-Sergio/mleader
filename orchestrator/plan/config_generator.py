@@ -30,13 +30,15 @@ def generate_config(
     Generates adaptive_profile.config from the ExecutionPlan and writes it to disk.
     Returns the absolute path of the generated file.
 
-    The generated profile only sets params.* values — it does NOT use
-    process { withName: ... } blocks, because maxForks is already handled
-    inside the pipeline .nf files via the params.maxforks directive:
+    The generated profile sets params.maxforks_freesurfer and
+    params.maxforks_fastsurfer separately, so each Nextflow process
+    reads its own parameter:
 
         process freesurfer {
-            maxForks params.maxforks
-            ...
+            maxForks params.maxforks_freesurfer
+        }
+        process fastsurfer {
+            maxForks params.maxforks_fastsurfer
         }
     """
     env = Environment(
@@ -46,24 +48,24 @@ def generate_config(
     )
     template = env.get_template(TEMPLATE_NAME)
 
-    # GPU info for header comment
     if profile.gpu:
         gpu_info = f"{profile.gpu.name} ({profile.gpu.vram_total_gb:.0f}GB VRAM)"
     else:
         gpu_info = "not available"
 
     context = {
-        "generated_at":     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "hostname":         socket.gethostname(),
-        "gpu_info":         gpu_info,
-        "ram_available_gb": plan.ram_available_gb,
-        "cpu_threads":      plan.cpu_threads,
-        "cpu_cores_free":   plan.cpu_cores_free,
-        "source":           plan.source,
-        "brain_segmenter":  plan.brain_segmenter,
+        "generated_at":       datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "hostname":           socket.gethostname(),
+        "gpu_info":           gpu_info,
+        "ram_available_gb":   plan.ram_available_gb,
+        "cpu_threads":        plan.cpu_threads,
+        "cpu_cores_free":     plan.cpu_cores_free,
+        "source":             plan.source,
+        "brain_segmenter":    plan.brain_segmenter,
         "fastsurfer_device":  plan.fastsurfer_device,
         "fastsurfer_threads": plan.fastsurfer_threads,
-        "maxforks_segmenter": plan.maxforks_segmenter,
+        "maxforks_freesurfer": plan.maxforks_freesurfer,
+        "maxforks_fastsurfer": plan.maxforks_fastsurfer,
         "pyradiomics_jobs":   plan.pyradiomics_jobs,
     }
 

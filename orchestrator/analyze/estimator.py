@@ -20,7 +20,7 @@ Parameter resolution per segmenter:
      confirmed by %cpu ~99% in trace files)
 
   pyradiomics:
-    Always hardware-based: pyradiomics_jobs = cpu_threads - 1
+    Always hardware-based: pyradiomics_jobs = cpu_cores_free - 1
     (PyRadiomics is single-instance per run, not per-subject)
 
 No safety margin is applied to peak_rss because the maximum observed
@@ -47,11 +47,12 @@ class ExecutionPlan:
     Output of the Analyze phase.
     Contains all parameter decisions to be passed to Plan.
     """
-    brain_segmenter:    str
-    fastsurfer_device:  Optional[str]
-    maxforks_segmenter: int
-    fastsurfer_threads: Optional[int]
-    pyradiomics_jobs:   int
+    brain_segmenter:      str
+    fastsurfer_device:    Optional[str]
+    maxforks_freesurfer:  int
+    maxforks_fastsurfer:  int
+    fastsurfer_threads:   Optional[int]
+    pyradiomics_jobs:     int
 
     # metadata for reporting
     vram_free_gb:           Optional[float]
@@ -110,64 +111,61 @@ def estimate_params(
         and "brain_segmenter" not in profile.fallbacks
     )
 
-    # ── Compute maxForks for both segmenters ──────────────────────────
-    # FreeSurfer
+    # ── Compute maxForks for FreeSurfer ──────────────────────────────
     if ram_per_subject_gb_freesurfer is not None:
-        maxforks_fs = min(
+        maxforks_freesurfer = min(
             math.floor(profile.ram_available_gb / ram_per_subject_gb_freesurfer),
             cpu_cores_free
         )
+        maxforks_freesurfer = max(1, maxforks_freesurfer)
         source_fs = "trace_empirical"
     else:
-        maxforks_fs = cpu_cores_free
-        source_fs   = "hardware_conservative"
+        maxforks_freesurfer = cpu_cores_free
+        source_fs           = "hardware_conservative"
 
-    # FastSurfer GPU
+    # ── Compute maxForks for FastSurfer ──────────────────────────────
     if gpu_available:
         if vram_per_subject_gb is not None:
-            maxforks_fas = min(
+            maxforks_fastsurfer = min(
                 math.floor(profile.gpu.vram_free_gb / vram_per_subject_gb),
                 cpu_cores_free
             )
             source_fas = "dry_run"
         elif ram_per_subject_gb_fastsurfer_gpu is not None:
-            maxforks_fas = min(
+            maxforks_fastsurfer = min(
                 math.floor(profile.ram_available_gb / ram_per_subject_gb_fastsurfer_gpu),
                 cpu_cores_free
             )
             source_fas = "trace_empirical_ram_proxy"
         else:
-            maxforks_fas = 1
-            source_fas   = "hardware_conservative"
+            maxforks_fastsurfer = 1
+            source_fas          = "hardware_conservative"
+        maxforks_fastsurfer = max(1, maxforks_fastsurfer)
     else:
-        maxforks_fas = 0  # fastsurfer not available
-        source_fas   = "unavailable"
+        maxforks_fastsurfer = 0   # fastsurfer not available
+        source_fas          = "unavailable"
 
     # ── Throughput comparison ─────────────────────────────────────────
-    # throughput = maxForks / (duration_mean_min / 60)  [subjects/hour]
-    # Requires duration_mean from trace files for both segmenters.
-    # If data is missing for either, fall back to GPU availability rule.
     if (
         gpu_available
         and duration_mean_min_freesurfer is not None
         and duration_mean_min_fastsurfer is not None
-        and maxforks_fas > 0
+        and maxforks_fastsurfer > 0
     ):
-        tp_fs  = maxforks_fs  / (duration_mean_min_freesurfer  / 60)
-        tp_fas = maxforks_fas / (duration_mean_min_fastsurfer / 60)
+        tp_fs  = maxforks_freesurfer  / (duration_mean_min_freesurfer  / 60)
+        tp_fas = maxforks_fastsurfer / (duration_mean_min_fastsurfer / 60)
 
         use_fastsurfer = tp_fas > tp_fs
         source = f"throughput_comparison (fs={tp_fs:.2f} vs fas={tp_fas:.2f} subj/h)"
 
         print(f"[Analyze] Throughput FreeSurfer:  {tp_fs:.2f} subj/h "
-              f"(maxForks={maxforks_fs}, duration={duration_mean_min_freesurfer:.0f}min)")
+              f"(maxForks={maxforks_freesurfer}, duration={duration_mean_min_freesurfer:.0f}min)")
         print(f"[Analyze] Throughput FastSurfer:  {tp_fas:.2f} subj/h "
-              f"(maxForks={maxforks_fas}, duration={duration_mean_min_fastsurfer:.0f}min)")
+              f"(maxForks={maxforks_fastsurfer}, duration={duration_mean_min_fastsurfer:.0f}min)")
         print(f"[Analyze] Winner: {'fastsurfer' if use_fastsurfer else 'freesurfer'}")
 
     elif gpu_available:
-        # no duration data for comparison — use GPU if available
-        use_fastsurfer = maxforks_fas > 0
+        use_fastsurfer = maxforks_fastsurfer > 0
         source = source_fas if use_fastsurfer else source_fs
     else:
         use_fastsurfer = False
@@ -177,14 +175,12 @@ def estimate_params(
     if use_fastsurfer:
         brain_segmenter    = "fastsurfer"
         fastsurfer_device  = "cuda"
-        maxforks           = maxforks_fas
         fastsurfer_threads = max(2, profile.cpu_threads - 1)
         ram_used           = ram_per_subject_gb_fastsurfer_gpu
         vram_reported      = vram_per_subject_gb
     else:
         brain_segmenter    = profile.fallbacks.get("brain_segmenter", "freesurfer")
         fastsurfer_device  = None
-        maxforks           = maxforks_fs
         fastsurfer_threads = None
         ram_used           = ram_per_subject_gb_freesurfer
         vram_reported      = None
@@ -193,16 +189,17 @@ def estimate_params(
     pyradiomics_jobs = max(1, cpu_cores_free - 1)
 
     return ExecutionPlan(
-        brain_segmenter    = brain_segmenter,
-        fastsurfer_device  = fastsurfer_device,
-        maxforks_segmenter = maxforks,
-        fastsurfer_threads = fastsurfer_threads,
-        pyradiomics_jobs   = pyradiomics_jobs,
-        vram_free_gb       = profile.gpu.vram_free_gb if profile.gpu else None,
-        ram_available_gb   = profile.ram_available_gb,
-        cpu_threads        = profile.cpu_threads,
-        cpu_cores_free     = cpu_cores_free,
-        vram_per_subject_gb= vram_reported,
-        ram_per_subject_gb = ram_used,
-        source             = source,
+        brain_segmenter     = brain_segmenter,
+        fastsurfer_device   = fastsurfer_device,
+        maxforks_freesurfer = maxforks_freesurfer,
+        maxforks_fastsurfer = maxforks_fastsurfer,
+        fastsurfer_threads  = fastsurfer_threads,
+        pyradiomics_jobs    = pyradiomics_jobs,
+        vram_free_gb        = profile.gpu.vram_free_gb if profile.gpu else None,
+        ram_available_gb    = profile.ram_available_gb,
+        cpu_threads         = profile.cpu_threads,
+        cpu_cores_free      = cpu_cores_free,
+        vram_per_subject_gb = vram_reported,
+        ram_per_subject_gb  = ram_used,
+        source              = source,
     )

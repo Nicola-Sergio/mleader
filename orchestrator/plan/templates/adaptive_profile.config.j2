@@ -21,7 +21,8 @@ profiles {
         {% endif %}
 
         // ── Parallelism ───────────────────────────────────────────────
-        params.maxforks         = {{ maxforks_segmenter }}
+        maxforks_freesurfer = {{ maxforks_freesurfer }}
+        maxforks_fastsurfer = {{ maxforks_fastsurfer }}
         params.pyradiomics_jobs = {{ pyradiomics_jobs }}
     }
 }
