@@ -49,31 +49,41 @@ def _build_nextflow_cmd(
     return cmd
 
 
-def _read_maxforks_from_config(config_path: str) -> Optional[int]:
-    """Reads the current value of maxForks from the generated config."""
+def _read_maxforks_from_config(config_path: str, brain_segmenter: str) -> Optional[int]:
+    """Reads the current maxForks value for the active segmenter from the generated config."""
+    param_name = (
+        "params.maxforks_fastsurfer"
+        if brain_segmenter == "fastsurfer"
+        else "params.maxforks_freesurfer"
+    )
     try:
         content = Path(config_path).read_text()
         for line in content.split("\n"):
-            if "params.maxforks" in line and "=" in line:
+            if param_name in line and "=" in line:
                 val = line.split("=")[1].strip()
                 return int(val)
     except (OSError, ValueError):
         return None
 
 
-def _update_maxforks_in_config(config_path: str, new_value: int) -> None:
-    """Updates maxForks in the generated config for the retry."""
+def _update_maxforks_in_config(config_path: str, new_value: int, brain_segmenter: str) -> None:
+    """Updates the maxForks for the active segmenter in the generated config for the retry."""
+    param_name = (
+        "params.maxforks_fastsurfer"
+        if brain_segmenter == "fastsurfer"
+        else "params.maxforks_freesurfer"
+    )
     content = Path(config_path).read_text()
     lines = []
     for line in content.split("\n"):
-        if "params.maxforks" in line and "=" in line:
-            lines.append(f"        params.maxforks          = {new_value}")
-        elif "maxForks = " in line and "feature_extraction" not in line:
-            lines.append(f"                maxForks = {new_value}")
+        if param_name in line and "=" in line:
+            # preserve indentation
+            indent = len(line) - len(line.lstrip())
+            lines.append(f"{' ' * indent}{param_name} = {new_value}")
         else:
             lines.append(line)
     Path(config_path).write_text("\n".join(lines))
-    print(f"[Execute] maxForks aggiornato a {new_value} per il retry")
+    print(f"[Execute] {param_name} updated to {new_value} for retry")
 
 
 def supervise(
@@ -84,6 +94,7 @@ def supervise(
     pipeline_type: str = "preprocessing",
     auto: bool = False,
     extra_args: list[str] = None,
+    brain_segmenter: str = "freesurfer",
 ) -> RunResult:
     """
     Launches Nextflow and supervises the lifecycle of the pipeline.
@@ -116,7 +127,7 @@ def supervise(
             print("[Execute] Pipeline completed successfully.")
             return RunResult(success=True, returncode=0, attempts=attempts)
 
-        # Classifica il fallimento leggendo .nextflow.log
+        # Classify the failure by reading .nextflow.log
         cause = classify_failure(str(Path(repo_root) / ".nextflow.log"))
         print(f"[Execute] Failure detected: {cause.value}")
 
@@ -124,8 +135,8 @@ def supervise(
             current = _read_maxforks_from_config(config_path)
             if current and current > 1:
                 new_val = max(1, int(current * RETRY_REDUCTION_FACTOR))
-                print(f"[Execute] OOM VRAM — riduco maxForks: {current} → {new_val}")
-                _update_maxforks_in_config(config_path, new_val)
+                print(f"[Execute] OOM VRAM — reducing maxForks: {current} → {new_val}")
+                _update_maxforks_in_config(config_path, new_val, brain_segmenter)
                 time.sleep(5)
                 continue
 
@@ -133,13 +144,13 @@ def supervise(
             current = _read_maxforks_from_config(config_path)
             if current and current > 1:
                 new_val = max(1, int(current * RETRY_REDUCTION_FACTOR))
-                print(f"[Execute] OOM RAM — riduco maxForks: {current} → {new_val}")
-                _update_maxforks_in_config(config_path, new_val)
+                print(f"[Execute] OOM RAM — reducing maxForks: {current} → {new_val}")
+                _update_maxforks_in_config(config_path, new_val, brain_segmenter)
                 time.sleep(5)
                 continue
 
         else:
-            # Causa non recuperabile automaticamente
+            # Failure not recoverable automatically
             print(f"[Execute] Failure not recoverable: {cause.value}")
             print("[Execute] Consult .nextflow.log for details.")
             return RunResult(
