@@ -29,6 +29,22 @@ def check_nextflow_version(profile: HardwareProfile) -> None:
         profile.nextflow_version = None
 
 
+def check_java_version(profile: HardwareProfile) -> None:
+    """
+    Checks if Java 17+ is installed (required by Nextflow).
+    Java writes version info to stderr.
+    """
+    try:
+        result = subprocess.run(
+            ["java", "-version"],
+            capture_output=True, text=True, timeout=10,
+        )
+        match = re.search(r'version "([^"]+)"', result.stderr)
+        profile.java_version = match.group(1) if match else None
+    except (subprocess.SubprocessError, FileNotFoundError):
+        profile.java_version = None
+
+
 def check_docker_gpu_runtime(profile: HardwareProfile) -> None:
     """
     Checks if nvidia-container-toolkit is installed on the host.
@@ -56,7 +72,7 @@ def check_docker_gpu_runtime(profile: HardwareProfile) -> None:
 
     if not profile.docker_gpu_runtime:
         print(
-            "[Monitor] nvidia-container-toolkit not found in PATH. "
+            "[Monitor]  in PATH. "
             "Install it to enable GPU support in Docker containers. "
         )
 
@@ -118,6 +134,7 @@ def run_environment_checks(
     Runs all the environment checks and populates the profile.
     """
     check_nextflow_version(profile)
+    check_java_version(profile)
     check_docker_gpu_runtime(profile)
     check_fs_license(profile, repo_root)
     check_containers(profile, repo_root, compose_file)

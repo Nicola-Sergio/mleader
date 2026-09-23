@@ -38,19 +38,20 @@ class HardwareProfile:
     # Disco
     disk_free_gb: float
 
-    # GPU (None se assente o non rilevabile)
+    # GPU (None if not present or not findable)
     gpu: Optional[GpuInfo] = None
     cpu_load_1min: float = 0.0
 
-    # Ambiente (popolato da environment.py)
+    # Environment (seeded by environment.py)
     nextflow_version: Optional[str] = None
+    java_version: Optional[str] = None
     pipeline_dsl: Optional[str] = None
     docker_gpu_runtime: bool = False
     fs_license_present: bool = False
     containers_built: list[str] = field(default_factory=list)
     containers_missing: list[str] = field(default_factory=list)
 
-    # Preflight check results (popolato da preflight.py)
+    # Preflight check results (seeded by preflight.py)
     preflight_passed: bool = False
     preflight_errors: list[str] = field(default_factory=list)
     preflight_warnings: list[str] = field(default_factory=list)
@@ -59,8 +60,8 @@ class HardwareProfile:
 
 def probe_gpu() -> Optional[GpuInfo]:
     """
-    Interroga nvidia-smi per rilevare la GPU e la VRAM disponibile.
-    Restituisce None se la GPU non è presente o nvidia-smi non è installato.
+    Queries nvidia-smi to detect the GPU and available VRAM.
+    Returns None if the GPU is not present or nvidia-smi is not installed.
     """
     try:
         out = subprocess.check_output(
@@ -92,7 +93,7 @@ def probe_gpu() -> Optional[GpuInfo]:
 
 def check_vgpu_license(gpu: GpuInfo) -> None:
     """
-    Verifica lo stato della licenza vGPU interrogando `nvidia-smi -q`.
+    Checks the status of the vGPU license by querying `nvidia-smi -q`.
     """
     try:
         out = subprocess.check_output(
@@ -115,7 +116,7 @@ def check_vgpu_license(gpu: GpuInfo) -> None:
 
 def probe_hardware(work_dir: str = ".") -> HardwareProfile:
     """
-    Relieve hardware resources of the current host.
+    Probes the hardware resources of the current host.
     """
     # CPU
     load_1min = psutil.getloadavg()[0]

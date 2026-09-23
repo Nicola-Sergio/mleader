@@ -66,15 +66,29 @@ def run_preflight_checks(profile: HardwareProfile) -> None:
             "Nextflow not found. "
             "Please, install Nextflow"
         )
+    # 2. Java 17+ installed
+    if profile.java_version is None:
+        errors.append(
+            "Java not found. "
+            "Install Java 17 or later."
+        )
+    else:
+        raw = profile.java_version.split(".")[0]
+        major = int(raw) if raw != "1" else int(profile.java_version.split(".")[1])
+        if major < 17:
+            errors.append(
+                f"Java {major} detected but Java 17+ is required by Nextflow. "
+                "Upgrade to Java 17+ ."
+            )
 
-    # 2. FreeSurfer license present
+    # 3. FreeSurfer license present
     if not profile.fs_license_present:
         errors.append(
             "license.txt not found in repo root. "
             "Obtain the FreeSurfer license and place it as license.txt in the project root."
         )
 
-    # 3. Required Docker containers built
+    # 4. Required Docker containers built
     if profile.containers_missing:
         missing_str = ", ".join(profile.containers_missing)
         errors.append(

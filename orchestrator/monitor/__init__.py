@@ -16,7 +16,7 @@ def run_monitor(repo_root: str = ".",
     """
     Executes the entire Monitor phase:
     1. Hardware profiling (GPU, RAM, CPU, disk)
-    2. Environment check (nextflow, docker, licenses, container)
+    2. Environment check (nextflow, java, docker, licenses, container)
     3. Preflight checks (critical constraints and fallbacks)
 
     Returns a completely populated HardwareProfile.
