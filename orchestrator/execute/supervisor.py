@@ -115,7 +115,7 @@ def supervise(
           if profile and getattr(profile, 'pipeline_dsl', None) == "1":
             env["NXF_SYNTAX_PARSER"] = "v1"
             print("[Execute] DSL1 detected — setting NXF_SYNTAX_PARSER=v1 automatically")
-            proc = subprocess.run(cmd, check=False, cwd=repo_root)
+          proc = subprocess.run(cmd, check=False, cwd=repo_root)
         except FileNotFoundError:
             print("[Execute] ERROR: nextflow not found in PATH")
             return RunResult(success=False, returncode=127, attempts=attempts, failure_cause="nextflow_not_found")
@@ -132,7 +132,7 @@ def supervise(
         print(f"[Execute] Failure detected: {cause.value}")
 
         if cause == FailureCause.OOM_VRAM and attempts <= MAX_RETRIES:
-            current = _read_maxforks_from_config(config_path)
+            current = _read_maxforks_from_config(config_path, brain_segmenter)
             if current and current > 1:
                 new_val = max(1, int(current * RETRY_REDUCTION_FACTOR))
                 print(f"[Execute] OOM VRAM — reducing maxForks: {current} → {new_val}")
@@ -141,7 +141,7 @@ def supervise(
                 continue
 
         elif cause == FailureCause.OOM_RAM and attempts <= MAX_RETRIES:
-            current = _read_maxforks_from_config(config_path)
+            current = _read_maxforks_from_config(config_path, brain_segmenter)
             if current and current > 1:
                 new_val = max(1, int(current * RETRY_REDUCTION_FACTOR))
                 print(f"[Execute] OOM RAM — reducing maxForks: {current} → {new_val}")
