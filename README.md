@@ -117,7 +117,7 @@ ftd-orchestrator run \
 | `--pipeline-type` | `preprocessing` | Which trace folder to read (`preprocessing` or `training`) |
 | `--traces-dir` | `<repo-root>/reports/traces/<pipeline-type>/` | Custom directory for trace TSV files |
 | `--compose-file` | auto-detected | Custom docker-compose filename |
-| `--dry-run-sample` | None | Path to a sample `.nii` file for VRAM profiling via dry-run |
+| `--pilot-run-sample` | None | Path to a sample `.nii` file for VRAM profiling via pilot run |
 
 ### `ftd-orchestrator run`
 
@@ -161,7 +161,7 @@ Else (cold start):
 For **fastsurfer on GPU**:
 
 ```
-If dry-run VRAM measurement available:
+If pilot-run VRAM measurement available:
     maxForks = floor(vram_free × 0.80 / vram_per_subject)
 Elif trace data available (RAM host as proxy):
     maxForks = min(floor(ram_available × 0.80 / peak_rss_max), cpu_cores_free)
@@ -185,7 +185,7 @@ parameters came from:
 | Source | Meaning |
 |---|---|
 | `trace_empirical` | derived from peak_rss in previous trace TSV files |
-| `dry_run` | derived from VRAM measured during a fastsurfer dry-run |
+| `pilot_run` | derived from VRAM measured during a fastsurfer pilot-run |
 | `trace_empirical_ram_proxy` | fastsurfer GPU — used RAM host as VRAM proxy |
 | `hardware_conservative` | cold start — no historical data, uses cpu_cores_free |
 
@@ -206,7 +206,7 @@ across all COMPLETED tasks is used as the worst-case estimate.
 
 > **Note on VRAM**: Nextflow trace files do not record GPU VRAM usage in
 > on-premise Docker setups (only available with Fusion + Seqera Platform,
-> Nextflow >= 26.03.3-edge). For VRAM estimation, use `--dry-run-sample`.
+> Nextflow >= 26.03.3-edge). For VRAM estimation, use `--pilot-run-sample`.
 > See: https://github.com/nextflow-io/nextflow/issues/4286
 
 ---
