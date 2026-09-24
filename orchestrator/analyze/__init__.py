@@ -4,7 +4,7 @@ Evaluates hardware compatibility and estimates optimal pipeline parameters.
 Output: ExecutionPlan.
 
 Parameter resolution order:
-1. dry_run measurement (most accurate — measures actual VRAM/RAM on this host)
+1. pilot_run measurement (most accurate — measures actual VRAM/RAM on this host)
 2. empirical data from trace TSV files (peak_rss_max and duration_mean)
 3. hardware-conservative fallback (cold start — no historical data available)
 
@@ -18,7 +18,7 @@ Segmenter selection:
 from typing import Optional
 
 from .estimator import ExecutionPlan, estimate_params
-from .dry_run import profile_fastsurfer_vram
+from .pilot_run import profile_fastsurfer_vram
 from .trace_reader import get_peak_rss_for_process, extract_process_stats, find_trace_files
 
 
@@ -26,7 +26,7 @@ def run_analyze(
     profile,
     repo_root: str = ".",
     pipeline: str = "preprocessing",
-    dry_run: bool = False,
+    pilot_run: bool = False,
     sample_nii: Optional[str] = None,
     license_path: str = "license.txt",
     custom_traces_dir: Optional[str] = None,
@@ -37,7 +37,7 @@ def run_analyze(
     Steps:
     1. Read trace TSV files to get empirical peak_rss_max and duration_mean
        per process (freesurfer and fastsurfer)
-    2. (optional) dry-run on a sample subject to measure VRAM
+    2. (optional) pilot-run on a sample subject to measure VRAM
     3. Estimate optimal parameters and select segmenter via throughput comparison
 
     Parameters
@@ -48,13 +48,13 @@ def run_analyze(
         Root of the FTD pipeline repository. Used to locate trace files.
     pipeline : str
         "preprocessing" or "training". Determines which trace folder to read.
-    dry_run : bool
+    pilot_run : bool
         If True and GPU is available, runs fastsurfer on sample_nii to
         measure VRAM empirically (takes 15-30 minutes).
     sample_nii : str, optional
-        Path to a sample .nii file for the dry-run.
+        Path to a sample .nii file for the pilot-run.
     license_path : str
-        Path to FreeSurfer license file (needed for dry-run).
+        Path to FreeSurfer license file (needed for pilot-run).
     custom_traces_dir : str, optional
         Override the default traces directory. If None, uses
         <repo_root>/reports/traces/<pipeline>/
@@ -96,9 +96,9 @@ def run_analyze(
     else:
         print("[Analyze] No trace files found — will use hardware-conservative fallback")
 
-    # ── Step 2: dry-run for VRAM (optional) ──────────────────────────
-    if dry_run and sample_nii and profile.gpu and profile.docker_gpu_runtime:
-        print("[Analyze] Starting FastSurfer dry-run for VRAM profiling...")
+    # ── Step 2: pilot-run for VRAM (optional) ──────────────────────────
+    if pilot_run and sample_nii and profile.gpu and profile.docker_gpu_runtime:
+        print("[Analyze] Starting FastSurfer pilot-run for VRAM profiling...")
         print("[Analyze] This will take 15-30 minutes...")
         vram_per_subject = profile_fastsurfer_vram(
             sample_nii=sample_nii,
@@ -107,7 +107,7 @@ def run_analyze(
         if vram_per_subject:
             print(f"[Analyze] Measured VRAM: {vram_per_subject:.2f} GB per subject")
         else:
-            print("[Analyze] Dry-run failed — VRAM not measured")
+            print("[Analyze] Pilot-run failed — VRAM not measured")
 
     # ── Step 3: estimate parameters ───────────────────────────────────
     print("[Analyze] Estimating optimal parameters...")

@@ -1,5 +1,5 @@
 """
-Dry-run profiler — Analyze component.
+Pilot-run profiler — Analyze component.
 Run FastSurfer on a single sample subject and measure
 VRAM consumption during execution.
 Inspired by Lotaru's principle: measure empirically instead
@@ -56,7 +56,7 @@ def profile_fastsurfer_vram(
     the peak VRAM consumption during execution.
 
     Returns the estimated cost in GB per subject (including a safety margin),
-    or None if the dry-run fails.
+    or None if the pilot-run fails.
 
     Parameters:
         sample_nii: path to the .nii file of the sample subject
@@ -97,11 +97,11 @@ def profile_fastsurfer_vram(
         "--entrypoint", "",
         "-v", f"{nii_path.parent}:/input:ro",
         "-v", f"{lic_path.parent}:/license:ro",
-        "-v", "/tmp/dry_run_output:/output",
+        "-v", "/tmp/pilot_run_output:/output",
         fastsurfer_image,
         "run_fastsurfer.sh",
         "--t1", f"/input/{nii_path.name}",
-        "--sid", "dry_run_subject",
+        "--sid", "pilot_run_subject",
         "--sd", "/output",
         "--fs_license", f"/license/{lic_path.name}",
         "--device", "cuda",
@@ -113,11 +113,11 @@ def profile_fastsurfer_vram(
     try:
         subprocess.run(cmd, check=True, timeout=3600)
     except subprocess.CalledProcessError as e:
-        print(f"[DryRun] FastSurfer failed during the dry-run: {e}")
+        print(f"[PilotRun] FastSurfer failed during the pilot-run: {e}")
         stop_event.set()
         return None
     except subprocess.TimeoutExpired:
-        print("[DryRun] Timeout during the dry-run (>60min)")
+        print("[PilotRun] Timeout during the pilot-run (>60min)")
         stop_event.set()
         return None
     finally:

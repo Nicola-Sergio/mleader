@@ -2,14 +2,14 @@
 Capacity estimator — Analyze component.
 
 Estimates optimal parameters for the FTD pipeline based on:
-1. Empirical VRAM measurement from dry_run (fastsurfer GPU only)
+1. Empirical VRAM measurement from pilot_run (fastsurfer GPU only)
 2. Empirical peak_rss from trace TSV files (all processes)
 3. Hardware-conservative fallback (cold start — no data available)
 
 Parameter resolution per segmenter:
 
   fastsurfer (cuda):
-    - VRAM from dry_run        -> maxForks = floor(vram_free / vram_cost_per_subject)
+    - VRAM from pilot_run        -> maxForks = floor(vram_free / vram_cost_per_subject)
     - RAM proxy from trace GPU -> maxForks = floor(ram_available / ram_cost_per_subject)
     - Cold start               -> maxForks = 1 (safe: unknown VRAM consumption)
 
@@ -87,7 +87,7 @@ def estimate_params(
     profile : HardwareProfile
         Populated by the Monitor phase.
     vram_per_subject_gb : float, optional
-        VRAM cost per subject measured by dry_run (fastsurfer GPU).
+        VRAM cost per subject measured by pilot_run (fastsurfer GPU).
     ram_per_subject_gb_freesurfer : float, optional
         RAM cost per subject from trace files (freesurfer peak_rss_max).
     ram_per_subject_gb_fastsurfer_gpu : float, optional
@@ -130,7 +130,7 @@ def estimate_params(
                 math.floor(profile.gpu.vram_free_gb / vram_per_subject_gb),
                 cpu_cores_free
             )
-            source_fas = "dry_run"
+            source_fas = "pilot_run"
         elif ram_per_subject_gb_fastsurfer_gpu is not None:
             maxforks_fastsurfer = min(
                 math.floor(profile.ram_available_gb / ram_per_subject_gb_fastsurfer_gpu),

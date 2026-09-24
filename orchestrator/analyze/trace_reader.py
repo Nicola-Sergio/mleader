@@ -8,7 +8,7 @@ Limitations:
 - VRAM is NOT available in Nextflow trace files for on-premise Docker setups.
   GPU memory metrics are only collected when using Fusion + Seqera Platform
   (Nextflow >= 26.03.3-edge, Fusion >= 2.5.10). See: github.com/nextflow-io/nextflow/issues/4286
-  For VRAM estimation, use dry_run.py instead.
+  For VRAM estimation, use pilot_run.py instead.
 - peak_rss = RAM host (physical memory), not VRAM.
 - For fastsurfer on GPU, peak_rss represents the host RAM used by the
   post-processing CPU component, not the GPU VRAM used by the CNN inference.

@@ -97,9 +97,9 @@ def main() -> None:
         help="Launch the pipeline without asking for confirmation",
     )
     run_parser.add_argument(
-        "--dry-run-sample",
+        "--pilot-run-sample",
         default=None,
-        help="Path to a sample .nii file for VRAM profiling via dry-run (optional)",
+        help="Path to a sample .nii file for VRAM profiling via pilot run (optional)",
     )
     run_parser.add_argument(
         "--traces-dir",
@@ -178,13 +178,13 @@ def main() -> None:
         sys.exit(1)
 
     # ── ANALYZE ───────────────────────────────────────────────────────
-    dry_run_sample = getattr(args, "dry_run_sample", None)
+    pilot_run_sample = getattr(args, "pilot_run_sample", None)
     plan = run_analyze(
         profile,
         repo_root=args.repo_root,
         pipeline=getattr(args, "pipeline_type", "preprocessing"),
-        dry_run=bool(dry_run_sample),
-        sample_nii=dry_run_sample,
+        pilot_run=bool(pilot_run_sample),
+        sample_nii=pilot_run_sample,
         license_path=f"{args.repo_root}/license.txt",
         custom_traces_dir=getattr(args, "traces_dir", None),
     )
