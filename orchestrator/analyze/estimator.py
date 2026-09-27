@@ -175,7 +175,7 @@ def estimate_params(
     if use_fastsurfer:
         brain_segmenter    = "fastsurfer"
         fastsurfer_device  = "cuda"
-        fastsurfer_threads = max(2, profile.cpu_threads - 1)
+        fastsurfer_threads = max(2, (profile.cpu_threads - 1) // maxforks_fastsurfer )
         ram_used           = ram_per_subject_gb_fastsurfer_gpu
         vram_reported      = vram_per_subject_gb
     else:
