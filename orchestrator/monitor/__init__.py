@@ -12,7 +12,8 @@ from .pipeline_config import parse_pipeline_dsl
 
 
 def run_monitor(repo_root: str = ".",
-                compose_file: Optional[str] = None) -> HardwareProfile:
+                compose_file: Optional[str] = None,
+                pipeline: Optional[str] = None) -> HardwareProfile:
     """
     Executes the entire Monitor phase:
     1. Hardware profiling (GPU, RAM, CPU, disk)
@@ -25,7 +26,7 @@ def run_monitor(repo_root: str = ".",
     profile = probe_hardware(work_dir=repo_root)
 
     #relieve DSL version from pipeline file
-    profile.pipeline_dsl = parse_pipeline_dsl(repo_root)
+    profile.pipeline_dsl = parse_pipeline_dsl(repo_root,pipeline)
 
     print("[Monitor] Checking environment...")
     run_environment_checks(profile, repo_root=repo_root, compose_file=compose_file)

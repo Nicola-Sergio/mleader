@@ -168,7 +168,8 @@ def main() -> None:
     # ── MONITOR ───────────────────────────────────────────────────────
     profile = run_monitor(
         repo_root=args.repo_root,
-        compose_file=getattr(args, "compose_file", None)
+        compose_file=getattr(args, "compose_file", None),
+        pipeline=getattr(args, "pipeline", None)
         )
 
     if not profile.preflight_passed:
