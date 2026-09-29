@@ -115,7 +115,7 @@ def supervise(
           if profile and getattr(profile, 'pipeline_dsl', None) == "1":
             env["NXF_SYNTAX_PARSER"] = "v1"
             print("[Execute] DSL1 detected — setting NXF_SYNTAX_PARSER=v1 automatically")
-          proc = subprocess.run(cmd, check=False, cwd=repo_root)
+          proc = subprocess.run(cmd, check=False, cwd=repo_root, env=env)
         except FileNotFoundError:
             print("[Execute] ERROR: nextflow not found in PATH")
             return RunResult(success=False, returncode=127, attempts=attempts, failure_cause="nextflow_not_found")
