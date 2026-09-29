@@ -131,26 +131,24 @@ def supervise(
         cause = classify_failure(str(Path(repo_root) / ".nextflow.log"))
         print(f"[Execute] Failure detected: {cause.value}")
 
-        if cause == FailureCause.OOM_VRAM and attempts <= MAX_RETRIES:
+        if cause in (FailureCause.OOM_VRAM, FailureCause.OOM_RAM) and attempts <= MAX_RETRIES:
             current = _read_maxforks_from_config(config_path, brain_segmenter)
             if current and current > 1:
                 new_val = max(1, int(current * RETRY_REDUCTION_FACTOR))
-                print(f"[Execute] OOM VRAM — reducing maxForks: {current} → {new_val}")
+                label = "OOM VRAM" if cause == FailureCause.OOM_VRAM else "OOM RAM"
+                print(f"[Execute] {label} — reducing maxForks: {current} → {new_val}")
                 _update_maxforks_in_config(config_path, new_val, brain_segmenter)
                 time.sleep(5)
                 continue
-
-        elif cause == FailureCause.OOM_RAM and attempts <= MAX_RETRIES:
-            current = _read_maxforks_from_config(config_path, brain_segmenter)
-            if current and current > 1:
-                new_val = max(1, int(current * RETRY_REDUCTION_FACTOR))
-                print(f"[Execute] OOM RAM — reducing maxForks: {current} → {new_val}")
-                _update_maxforks_in_config(config_path, new_val, brain_segmenter)
-                time.sleep(5)
-                continue
-
+            else:
+                print(f"[Execute] {cause.value} — maxForks already at minimum, cannot reduce further.")
+                return RunResult(
+                    success=False,
+                    returncode=proc.returncode,
+                    attempts=attempts,
+                    failure_cause=cause.value,
+                )
         else:
-            # Failure not recoverable automatically
             print(f"[Execute] Failure not recoverable: {cause.value}")
             print("[Execute] Consult .nextflow.log for details.")
             return RunResult(
