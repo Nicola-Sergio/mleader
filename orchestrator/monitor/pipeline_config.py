@@ -47,7 +47,7 @@ def parse_docker_images(repo_root: str, compose_file: Optional[str] = None) -> l
 
 def parse_pipeline_dsl(
     repo_root: str,
-    pipeline_file: str = "nextflow/preprocessing.nf",
+    pipeline_file: str,
 ) -> Optional[str]:
     """
     Reads the DSL version declared in the pipeline file or nextflow.config.
