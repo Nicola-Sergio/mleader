@@ -615,7 +615,8 @@ class TestUpdateMaxforksInConfig(_Base):
             pytest.skip("_update_maxforks_in_config not found")
         cfg_file = self.tmp_path / "nextflow.config"
         cfg_file.write_text("        params.maxforks_fastsurfer = 2\n")
-        fn(str(cfg_file), "fastsurfer", 1)
+        # Real signature: _update_maxforks_in_config(config_path, new_value, brain_segmenter)
+        fn(str(cfg_file), 1, "fastsurfer")
         assert "params.maxforks_fastsurfer = 1" in cfg_file.read_text()
 
     def test_module_update_freesurfer(self):
@@ -627,7 +628,8 @@ class TestUpdateMaxforksInConfig(_Base):
             pytest.skip("_update_maxforks_in_config not found")
         cfg_file = self.tmp_path / "nextflow.config"
         cfg_file.write_text("        params.maxforks_freesurfer = 4\n")
-        fn(str(cfg_file), "freesurfer", 2)
+        # Real signature: _update_maxforks_in_config(config_path, new_value, brain_segmenter)
+        fn(str(cfg_file), 2, "freesurfer")
         assert "params.maxforks_freesurfer = 2" in cfg_file.read_text()
 
     def test_module_read_maxforks(self):
@@ -716,10 +718,19 @@ class TestClassifyFailure(_Base):
         fn = getattr(mod, "classify_failure", None)
         if fn is None:
             pytest.skip("classify_failure not found")
-        assert fn("CUDA out of memory") == "OOM_VRAM"
-        assert fn("Killed") == "OOM_RAM"
-        assert fn("ModuleNotFoundError") == "MISSING_PACKAGE"
-        assert fn("") == "UNKNOWN"
+        # classify_failure takes a PATH to a log file and returns a
+        # FailureCause enum (not a bare string, and not the log content).
+        FailureCause = getattr(mod, "FailureCause")
+
+        def classify_text(text: str):
+            log = self.tmp_path / ".nextflow.log"
+            log.write_text(text)
+            return fn(str(log))
+
+        assert classify_text("CUDA out of memory") == FailureCause.OOM_VRAM
+        assert classify_text("Killed") == FailureCause.OOM_RAM
+        assert classify_text("ModuleNotFoundError") == FailureCause.MISSING_PACKAGE
+        assert classify_text("nothing recognizable here") == FailureCause.UNKNOWN
 
 
 # ===========================================================================
@@ -1404,7 +1415,7 @@ class TestHardwareProfile(_Base):
             import dataclasses
             fields = {f.name for f in dataclasses.fields(HardwareProfile)}
             # At minimum these thesis-referenced fields should exist
-            expected = {"cpu_cores", "cpu_threads", "ram_available"}
+            expected = {"cpu_cores", "cpu_threads", "ram_available_gb"}
             missing = expected - fields
             assert not missing, f"HardwareProfile missing fields: {missing}"
         except TypeError:
@@ -1495,3 +1506,264 @@ class TestParseDockerImages(_Base):
         )
         images = fn(str(config))
         assert isinstance(images, (list, set, tuple))
+
+# ===========================================================================
+# TestEstimatorSourceProvenance  (open point 2)
+# Thesis: ExecutionPlan.source must report the PROVENANCE of the selected
+# segmenter's estimate and be one of the five documented values:
+#   {pilot_run, trace_empirical, trace_empirical_ram_proxy,
+#    hardware_conservative, unavailable}
+# Bug: in the throughput-comparison branch, source was overwritten with a
+# formatted string "throughput_comparison (fs=.. vs fas=.. subj/h)", which is
+# NOT a documented value. It must instead be source_fas if use_fastsurfer
+# else source_fs.
+# ===========================================================================
+
+class TestEstimatorSourceProvenance(_Base):
+
+    DOCUMENTED_SOURCES = {
+        "pilot_run",
+        "trace_empirical",
+        "trace_empirical_ram_proxy",
+        "hardware_conservative",
+        "unavailable",
+    }
+
+    def _profile_with_gpu(self):
+        hw = _require("orchestrator.monitor.hardware")
+        gpu = hw.GpuInfo(
+            name="NVIDIA A30",
+            vram_total_gb=24.0,
+            vram_free_gb=24.0,
+            driver_version="550.0",
+            compute_capability="8.0",
+        )
+        return hw.HardwareProfile(
+            cpu_cores=32,
+            cpu_threads=64,
+            cpu_load_percent=0.0,
+            ram_total_gb=512.0,
+            ram_available_gb=500.0,
+            disk_free_gb=1000.0,
+            gpu=gpu,
+            cpu_load_1min=0.0,
+            docker_gpu_runtime=True,
+        )
+
+    def test_source_is_documented_value_when_throughput_fires(self):
+        """
+        When duration data for both segmenters is available the throughput
+        comparison fires. The resulting source must still be one of the five
+        documented provenance values, not a free-form 'throughput_comparison'
+        string.
+        """
+        est = _require("orchestrator.analyze.estimator")
+        profile = self._profile_with_gpu()
+        plan = est.estimate_params(
+            profile,
+            ram_per_subject_gb_freesurfer=4.0,       # -> source_fs trace_empirical
+            ram_per_subject_gb_fastsurfer_gpu=4.0,   # -> source_fas trace_empirical_ram_proxy
+            duration_mean_min_freesurfer=40.0,
+            duration_mean_min_fastsurfer=10.0,
+        )
+        self.assertIn(
+            plan.source,
+            self.DOCUMENTED_SOURCES,
+            f"source={plan.source!r} is not a documented provenance value",
+        )
+        self.assertNotIn("throughput_comparison", plan.source)
+
+    def test_source_matches_selected_segmenter_provenance(self):
+        """
+        source must reflect the provenance of the WINNING segmenter:
+        source_fas when fastsurfer wins, source_fs when freesurfer wins.
+        """
+        est = _require("orchestrator.analyze.estimator")
+        profile = self._profile_with_gpu()
+
+        # FastSurfer wins (much shorter duration, plenty of VRAM via proxy).
+        plan_fas = est.estimate_params(
+            profile,
+            ram_per_subject_gb_freesurfer=4.0,
+            ram_per_subject_gb_fastsurfer_gpu=4.0,
+            duration_mean_min_freesurfer=60.0,
+            duration_mean_min_fastsurfer=5.0,
+        )
+        if plan_fas.brain_segmenter == "fastsurfer":
+            self.assertEqual(plan_fas.source, "trace_empirical_ram_proxy")
+        else:
+            self.assertEqual(plan_fas.source, "trace_empirical")
+
+        # FreeSurfer wins (fastsurfer extremely slow per subject).
+        plan_fs = est.estimate_params(
+            profile,
+            ram_per_subject_gb_freesurfer=4.0,
+            ram_per_subject_gb_fastsurfer_gpu=4.0,
+            duration_mean_min_freesurfer=5.0,
+            duration_mean_min_fastsurfer=600.0,
+        )
+        if plan_fs.brain_segmenter == "freesurfer":
+            self.assertEqual(plan_fs.source, "trace_empirical")
+
+
+# ===========================================================================
+# TestBuildNextflowCmd  (open point 6)
+# _build_nextflow_cmd must pass the pipeline-specific config
+# (nextflow_<pipeline_type>.config) as a -c BEFORE adaptive_profile.config,
+# so that the adaptive profile (passed last) wins on overlapping keys while the
+# pipeline config still contributes its includeConfig 'nextflow.config' + trace
+# / report blocks.
+# ===========================================================================
+
+class TestBuildNextflowCmd(_Base):
+
+    def _fn(self):
+        mod = _try_import("orchestrator.execute.supervisor")
+        if mod is None:
+            pytest.skip("supervisor module not available")
+        fn = getattr(mod, "_build_nextflow_cmd", None)
+        if fn is None:
+            pytest.skip("_build_nextflow_cmd not found")
+        return fn
+
+    def test_preprocessing_config_present(self):
+        cmd = self._fn()("nextflow/preprocessing.nf", "adaptive_profile.config",
+                         pipeline_type="preprocessing")
+        self.assertIn("nextflow_preprocessing.config", cmd)
+        self.assertIn("adaptive_profile.config", cmd)
+
+    def test_training_config_present(self):
+        cmd = self._fn()("nextflow/training.nf", "adaptive_profile.config",
+                         pipeline_type="training")
+        self.assertIn("nextflow_training.config", cmd)
+
+    def test_pipeline_config_before_adaptive(self):
+        """Pipeline config must come before the adaptive profile so adaptive wins."""
+        cmd = self._fn()("nextflow/preprocessing.nf", "adaptive_profile.config",
+                         pipeline_type="preprocessing")
+        i_pipeline = cmd.index("nextflow_preprocessing.config")
+        i_adaptive = cmd.index("adaptive_profile.config")
+        self.assertLess(i_pipeline, i_adaptive)
+
+    def test_each_config_has_its_own_minus_c(self):
+        """Both configs must be introduced by their own -c flag."""
+        cmd = self._fn()("nextflow/preprocessing.nf", "adaptive_profile.config",
+                         pipeline_type="preprocessing")
+        self.assertEqual(cmd[cmd.index("nextflow_preprocessing.config") - 1], "-c")
+        self.assertEqual(cmd[cmd.index("adaptive_profile.config") - 1], "-c")
+        self.assertEqual(cmd.count("-c"), 2)
+
+    def test_profile_flag_still_present(self):
+        cmd = self._fn()("nextflow/preprocessing.nf", "adaptive_profile.config",
+                         pipeline_type="preprocessing")
+        self.assertIn("-profile", cmd)
+        self.assertEqual(cmd[cmd.index("-profile") + 1], "adaptive_profile")
+
+    def test_supervise_threads_pipeline_type(self):
+        """
+        supervise() must forward its pipeline_type to _build_nextflow_cmd, so the
+        actual nextflow invocation carries the right pipeline-specific config.
+        """
+        mod = _try_import("orchestrator.execute.supervisor")
+        if mod is None:
+            pytest.skip("supervisor module not available")
+        captured = {}
+
+        def fake_run(cmd, *a, **kw):
+            captured["cmd"] = cmd
+            return types.SimpleNamespace(returncode=0)
+
+        with patch.object(mod.subprocess, "run", side_effect=fake_run):
+            mod.supervise(
+                pipeline="nextflow/training.nf",
+                config_path=str(self.tmp_path / "adaptive_profile.config"),
+                repo_root=str(self.tmp_path),
+                pipeline_type="training",
+                auto=True,
+            )
+        self.assertIn("nextflow_training.config", captured["cmd"])
+
+
+# ===========================================================================
+# TestOutputConfigResolution  (open point 5)
+# adaptive_profile.config must be written INSIDE repo_root. The Plan writes it
+# with Path(output_path).write_text(...), so a relative --output-config lands in
+# the launcher's CWD (which may differ from repo_root) instead of beside
+# nextflow.config where Nextflow (cwd=repo_root) and the retry logic expect it.
+# Fix: cli._resolve_output_config anchors a relative path to repo_root.
+# ===========================================================================
+
+class TestOutputConfigResolution(_Base):
+
+    def _resolver(self):
+        cli = _try_import("orchestrator.cli")
+        if cli is None:
+            pytest.skip("cli module not available")
+        fn = getattr(cli, "_resolve_output_config", None)
+        if fn is None:
+            pytest.skip("_resolve_output_config not found")
+        return fn
+
+    def test_relative_output_anchored_to_repo_root(self):
+        resolve = self._resolver()
+        repo = self.tmp_path / "repo"
+        repo.mkdir()
+        resolved = Path(resolve(str(repo), "adaptive_profile.config"))
+        self.assertEqual(resolved.parent, repo)
+        self.assertTrue(resolved.is_absolute())
+
+    def test_absolute_output_preserved(self):
+        resolve = self._resolver()
+        repo = self.tmp_path / "repo"
+        repo.mkdir()
+        custom = self.tmp_path / "elsewhere" / "my.config"
+        resolved = Path(resolve(str(repo), str(custom)))
+        self.assertEqual(resolved, custom)
+
+    def test_resolved_path_write_lands_in_repo_root_not_cwd(self):
+        """
+        End-to-end semantics of the fix: writing to the resolved path (exactly
+        what Plan's generate_config does) must create the file inside repo_root
+        even when the process CWD is a different directory.
+        """
+        resolve = self._resolver()
+        repo = self.tmp_path / "repo"
+        repo.mkdir()
+        launch_dir = self.tmp_path / "launch_dir"
+        launch_dir.mkdir()
+
+        import os
+        prev = os.getcwd()
+        try:
+            os.chdir(launch_dir)  # launcher CWD != repo_root
+            resolved = resolve(str(repo), "adaptive_profile.config")
+            Path(resolved).write_text("// generated\n")  # mirrors generate_config
+        finally:
+            os.chdir(prev)
+
+        self.assertTrue((repo / "adaptive_profile.config").exists(),
+                        "config must be written inside repo_root")
+        self.assertFalse((launch_dir / "adaptive_profile.config").exists(),
+                         "config must NOT be written in the launcher CWD")
+
+    def test_bug_reproduction_bare_relative_lands_in_cwd(self):
+        """
+        Regression guard documenting the ORIGINAL bug: writing the bare relative
+        default (the old behavior, no repo_root anchoring) lands in CWD, not
+        repo_root. This is exactly what the fix prevents.
+        """
+        repo = self.tmp_path / "repo"
+        repo.mkdir()
+        launch_dir = self.tmp_path / "launch_dir2"
+        launch_dir.mkdir()
+
+        import os
+        prev = os.getcwd()
+        try:
+            os.chdir(launch_dir)
+            Path("adaptive_profile.config").write_text("// generated\n")  # OLD behavior
+        finally:
+            os.chdir(prev)
+
+        self.assertTrue((launch_dir / "adaptive_profile.config").exists())
+        self.assertFalse((repo / "adaptive_profile.config").exists())
