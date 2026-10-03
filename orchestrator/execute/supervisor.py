@@ -37,11 +37,11 @@ def _build_nextflow_cmd(
     resume: bool = True,
     extra_args: list[str] = None,
 ) -> list[str]:
-    cmd = [
-        "nextflow", "run", pipeline,
-        "-c", config_path,
-        "-profile", "adaptive_profile",
-    ]
+    pipeline_config = f"nextflow_{pipeline_type}.config"
+    cmd = ["nextflow", "run", pipeline,
+        "-c", pipeline_config,      # prima
+        "-c", config_path,          # adaptive_profile dopo, così "vince"
+        "-profile", "adaptive_profile"]
     if resume:
         cmd.append("-resume")
     if extra_args:
@@ -105,7 +105,7 @@ def supervise(
 
     while attempts <= MAX_RETRIES:
         attempts += 1
-        cmd = _build_nextflow_cmd(pipeline, config_path, resume=(attempts > 1), extra_args=extra_args)
+        cmd = _build_nextflow_cmd(pipeline, config_path, pipeline_type=pipeline_type, resume=(attempts > 1), extra_args=extra_args)
 
         print(f"\n[Execute] Attempt {attempts}/{MAX_RETRIES + 1}")
         print(f"[Execute] Command: {' '.join(cmd)}")
