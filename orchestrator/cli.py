@@ -7,11 +7,25 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from .monitor import run_monitor
 from .analyze import run_analyze
 from .plan import run_plan
 from .execute import run_execute
+
+def _resolve_output_config(repo_root: str, output_config: str) -> str:
+    """
+
+    The adaptive config is consumed by Nextflow (launched with cwd=repo_root)
+    and read/rewritten by the retry logic; therefore, if --output-config is 
+    a relative path,it must be written INSIDE repo_root, not in the folder from 
+    which MLEADeR is launched. An absolute --output-config path is respected as-is.
+    """
+    p = Path(output_config)
+    if p.is_absolute():
+        return str(p)
+    return str(Path(repo_root) / p)
 
 def _print_summary(profile, plan, config_path: str) -> None:
     """Prints a human-readable summary before launching."""
@@ -191,7 +205,8 @@ def main() -> None:
     )
 
     # ── PLAN ──────────────────────────────────────────────────────────
-    config_path = run_plan(plan, profile, output_path=args.output_config)
+    output_config = _resolve_output_config(args.repo_root, args.output_config)
+    config_path = run_plan(plan, profile, output_path=output_config)
 
     # ── Riepilogo ─────────────────────────────────────────────────────
     _print_summary(profile, plan, config_path)
