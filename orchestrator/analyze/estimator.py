@@ -156,7 +156,7 @@ def estimate_params(
         tp_fas = maxforks_fastsurfer / (duration_mean_min_fastsurfer / 60)
 
         use_fastsurfer = tp_fas > tp_fs
-        source = f"throughput_comparison (fs={tp_fs:.2f} vs fas={tp_fas:.2f} subj/h)"
+        source = source_fas if use_fastsurfer else source_fs
 
         print(f"[Analyze] Throughput FreeSurfer:  {tp_fs:.2f} subj/h "
               f"(maxForks={maxforks_freesurfer}, duration={duration_mean_min_freesurfer:.0f}min)")
