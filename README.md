@@ -69,12 +69,16 @@ Runs Monitor + Analyze + Plan and prints a summary without launching anything.
 Useful to verify what parameters the module would use before committing to a run.
 
 ```bash
+#go into orchestrator folder before running command
+cd mleader
 mleader check --repo-root /path/to/CMND-MLHOps_DataPreparation/ --pipeline-type preprocessing
 ```
 
 ### Run preprocessing pipeline
 
 ```bash
+#go into orchestrator folder before running command
+cd mleader
 mleader run \
   --pipeline nextflow/preprocessing.nf \
   --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
@@ -92,6 +96,8 @@ The module will:
 ### Run training pipeline
 
 ```bash
+#go into orchestrator folder before running command
+cd mleader
 mleader run \
   --pipeline nextflow/training.nf \
   --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
@@ -109,6 +115,8 @@ mleader run \
 ### Launch without confirmation prompt
 
 ```bash
+#go into orchestrator folder before running command
+cd mleader
 mleader run \
   --pipeline nextflow/preprocessing.nf \
   --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
