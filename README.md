@@ -69,7 +69,7 @@ Runs Monitor + Analyze + Plan and prints a summary without launching anything.
 Useful to verify what parameters the module would use before committing to a run.
 
 ```bash
-mleader check --repo-root /path/to/CMND-MLHOps_DataPreparation/ --pipeline-type preprocessing
+mleader check --repo-root /path/to/CMND-MLHOps_DataPreparation/ --pipeline-type <preprocessing | training>
 ```
 
 ### Run preprocessing pipeline
