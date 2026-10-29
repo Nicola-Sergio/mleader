@@ -77,7 +77,7 @@ mleader check --repo-root /path/to/CMND-MLHOps_DataPreparation/ --pipeline-type 
 ```bash
 mleader run \
   --pipeline nextflow/preprocessing.nf \
-  --repo-root /path/to/CMND-MLHOps_DataPreparation/
+  --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
   --pipeline-type preprocessing
 ```
 
@@ -104,6 +104,7 @@ mleader run \
 mleader run \
   --pipeline nextflow/preprocessing.nf \
   --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
+  --pipeline-type training \
   --auto
 ```
 
