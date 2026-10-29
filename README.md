@@ -97,6 +97,14 @@ mleader run \
   --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
   --pipeline-type training
 ```
+> **Note on the training pipeline**: the module does not configure any
+> parameter relevant to the training pipeline. The training pipeline already
+> explores different hyperparameter combinations by construction and has no
+> per-subject parallelism to size, so there is nothing to tune on the basis of
+> the host resources. The `training` pipeline type is supported to leave the
+> architecture open to future extensions (for example, resource-aware
+> configuration of the training processes). Today, running it through
+> `mleader` only provides the environment checks and the supervised launch.
 
 ### Launch without confirmation prompt
 
