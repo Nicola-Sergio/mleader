@@ -48,6 +48,7 @@ Optional (for GPU support):
 ```bash
 git clone https://github.com/Nicola-Sergio/mleader.git
 cd mleader
+python3 -m venv .venv
 pip install -e .
 ```
 
