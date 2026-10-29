@@ -49,6 +49,7 @@ Optional (for GPU support):
 git clone https://github.com/Nicola-Sergio/mleader.git
 cd mleader
 python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
