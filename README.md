@@ -106,6 +106,33 @@ mleader run \
 > configuration of the training processes). Today, running it through
 > `mleader` only provides the environment checks and the supervised launch.
 
+### Pilot run (VRAM profiling for FastSurfer)
+ 
+Nextflow traces do not record VRAM, so the module can measure it directly.
+With `--pilot-run` it samples subjects at random from the folders listed in
+`params.dataset` (read from `<repo-root>/nextflow.config`), runs FastSurfer
+(`--seg_only`) on each of them while sampling the GPU memory, and uses the
+result to size `maxforks_fastsurfer`.
+ 
+```bash
+mleader check \
+  --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
+  --pipeline-type preprocessing \
+  --pilot-run
+```
+ 
+- The sample is drawn with a fixed seed (`--pilot-run-seed`, default `42`), so
+  the same dataset and seed always select the same subjects.
+- The default sample size is 10 subjects (`--pilot-run-n`).
+- The VRAM cost per subject is the **maximum** peak observed across the
+  sampled subjects, minus the baseline already in use, multiplied by a safety
+  margin of 1.15.
+- To profile one specific image instead of a random sample, pass
+  `--pilot-run-sample /path/to/subject.nii`.
+- The pilot run only affects the FastSurfer parameters. If FreeSurfer is the
+  segmenter selected by the throughput comparison, the configuration of the
+  pipeline does not change.
+
 ### Launch without confirmation prompt
 
 ```bash
@@ -129,6 +156,9 @@ mleader run \
 | `--pipeline-type` | `preprocessing` | Which trace folder to read (`preprocessing` or `training`) |
 | `--traces-dir` | `<repo-root>/reports/traces/<pipeline-type>/` | Custom directory for trace TSV files |
 | `--compose-file` | auto-detected | Custom docker-compose filename |
+| `--pilot-run` | False | Run a VRAM pilot run on a random sample of subjects drawn from `params.dataset` |
+| `--pilot-run-n` | `10` | Number of subjects sampled by `--pilot-run` |
+| `--pilot-run-seed` | `42` | Seed of the random sampling, so the same subjects are picked on every run |
 | `--pilot-run-sample` | None | Path to a sample `.nii` file for VRAM profiling via pilot run |
 
 ### `mleader run`
@@ -165,7 +195,7 @@ For **freesurfer** (single-threaded, 1 core per subject):
 
 ```
 If trace data available:
-    maxForks = min(floor(ram_available × 0.80 / peak_rss_max), cpu_cores_free)
+    maxForks = min(floor(ram_available / peak_rss_max), cpu_cores_free)
 Else (cold start):
     maxForks = cpu_cores_free
 ```
@@ -173,12 +203,14 @@ Else (cold start):
 For **fastsurfer on GPU**:
 
 ```
-If pilot-run VRAM measurement available:
-    maxForks = floor(vram_free / vram_per_subject)
-Elif trace data available (RAM host as proxy):
-    maxForks = min(floor(ram_available / peak_rss_max), cpu_cores_free)
-Else (cold start):
+VRAM measured (warm-up or pilot run):
+    maxForks = max(1, min(floor(vram_free / vram_per_subject), cpu_cores_free))
+Trace data available (host RAM as proxy):
+    maxForks = max(1, min(floor(ram_available / peak_rss_max), cpu_cores_free))
+Cold start:
     maxForks = 1
+No usable GPU:
+    maxForks = 0
 ```
 
 ### `pyradiomics_jobs`
