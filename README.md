@@ -174,9 +174,9 @@ For **fastsurfer on GPU**:
 
 ```
 If pilot-run VRAM measurement available:
-    maxForks = floor(vram_free × 0.80 / vram_per_subject)
+    maxForks = floor(vram_free / vram_per_subject)
 Elif trace data available (RAM host as proxy):
-    maxForks = min(floor(ram_available × 0.80 / peak_rss_max), cpu_cores_free)
+    maxForks = min(floor(ram_available / peak_rss_max), cpu_cores_free)
 Else (cold start):
     maxForks = 1
 ```
