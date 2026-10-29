@@ -1,5 +1,5 @@
 """
-CLI entry point — ftd-orchestrator.
+CLI entry point — mleader.
 Orchestrates the entire MAPE-K loop.
 """
 
@@ -8,7 +8,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-
+from .banner import print_banner
 from .monitor import run_monitor
 from .analyze import run_analyze
 from .plan import run_plan
@@ -26,6 +26,16 @@ def _resolve_output_config(repo_root: str, output_config: str) -> str:
     if p.is_absolute():
         return str(p)
     return str(Path(repo_root) / p)
+
+def _resolve_pipeline_file(pipeline: str | None, pipeline_type: str) -> str:
+     """
+     Return the .nf file to inspect.
+
+     An explicit --pipeline always wins (run). Commands that do not take it
+     (check) fall back to the conventional nextflow/<pipeline_type>.nf, so the
+     DSL detection looks at the same file the chosen pipeline type refers to.
+     """
+     return pipeline or f"nextflow/{pipeline_type}.nf"
 
 def _print_summary(profile, plan, config_path: str) -> None:
     """Prints a human-readable summary before launching."""
@@ -79,8 +89,9 @@ def _confirm_launch(pipeline: str) -> bool:
 
 
 def main() -> None:
+    print_banner()
     parser = argparse.ArgumentParser(
-        prog="ftd-orchestrator",
+        prog="mleader",
         description="Infrastructure-aware orchestrator per pipeline MLOps FTD",
     )
     subparsers = parser.add_subparsers(dest="command")
@@ -180,10 +191,14 @@ def main() -> None:
     args.repo_root = str(repo_root_path)
 
     # ── MONITOR ───────────────────────────────────────────────────────
+    pipeline_file = _resolve_pipeline_file(
+         getattr(args, "pipeline", None),
+         getattr(args, "pipeline_type", "preprocessing"),
+     )
     profile = run_monitor(
         repo_root=args.repo_root,
         compose_file=getattr(args, "compose_file", None),
-        pipeline=getattr(args, "pipeline", None)
+        pipeline=pipeline_file
         )
 
     if not profile.preflight_passed:

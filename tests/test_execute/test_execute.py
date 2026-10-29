@@ -1629,19 +1629,19 @@ class TestBuildNextflowCmd(_Base):
     def test_preprocessing_config_present(self):
         cmd = self._fn()("nextflow/preprocessing.nf", "adaptive_profile.config",
                          pipeline_type="preprocessing")
-        self.assertIn("nextflow_preprocessing.config", cmd)
+        self.assertIn("nextflow/nextflow_preprocessing.config", cmd)
         self.assertIn("adaptive_profile.config", cmd)
 
     def test_training_config_present(self):
         cmd = self._fn()("nextflow/training.nf", "adaptive_profile.config",
                          pipeline_type="training")
-        self.assertIn("nextflow_training.config", cmd)
+        self.assertIn("nextflow/nextflow_training.config", cmd)
 
     def test_pipeline_config_before_adaptive(self):
         """Pipeline config must come before the adaptive profile so adaptive wins."""
         cmd = self._fn()("nextflow/preprocessing.nf", "adaptive_profile.config",
                          pipeline_type="preprocessing")
-        i_pipeline = cmd.index("nextflow_preprocessing.config")
+        i_pipeline = cmd.index("nextflow/nextflow_preprocessing.config")
         i_adaptive = cmd.index("adaptive_profile.config")
         self.assertLess(i_pipeline, i_adaptive)
 
@@ -1649,7 +1649,7 @@ class TestBuildNextflowCmd(_Base):
         """Both configs must be introduced by their own -c flag."""
         cmd = self._fn()("nextflow/preprocessing.nf", "adaptive_profile.config",
                          pipeline_type="preprocessing")
-        self.assertEqual(cmd[cmd.index("nextflow_preprocessing.config") - 1], "-c")
+        self.assertEqual(cmd[cmd.index("nextflow/nextflow_preprocessing.config") - 1], "-c")
         self.assertEqual(cmd[cmd.index("adaptive_profile.config") - 1], "-c")
         self.assertEqual(cmd.count("-c"), 2)
 
@@ -1681,7 +1681,7 @@ class TestBuildNextflowCmd(_Base):
                 pipeline_type="training",
                 auto=True,
             )
-        self.assertIn("nextflow_training.config", captured["cmd"])
+        self.assertIn("nextflow/nextflow_training.config", captured["cmd"])
 
 
 # ===========================================================================

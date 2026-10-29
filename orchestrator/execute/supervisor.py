@@ -37,7 +37,7 @@ def _build_nextflow_cmd(
     resume: bool = True,
     extra_args: list[str] = None,
 ) -> list[str]:
-    pipeline_config = f"nextflow_{pipeline_type}.config"
+    pipeline_config = f"nextflow/nextflow_{pipeline_type}.config"
     cmd = ["nextflow", "run", pipeline,
         "-c", pipeline_config,      # prima
         "-c", config_path,          # adaptive_profile dopo, così "vince"
