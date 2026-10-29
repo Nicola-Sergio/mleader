@@ -104,7 +104,7 @@ mleader run \
 mleader run \
   --pipeline nextflow/preprocessing.nf \
   --repo-root /path/to/CMND-MLHOps_DataPreparation/ \
-  --pipeline-type training \
+  --pipeline-type preprocessing \
   --auto
 ```
 
