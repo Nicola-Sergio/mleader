@@ -91,8 +91,15 @@ def _confirm_launch(pipeline: str) -> bool:
     except (EOFError, KeyboardInterrupt):
         return False
 
-
 def main() -> None:
+    """Entry point: runs the CLI and turns Ctrl+C into a clean exit."""
+    try:
+        _main()
+    except KeyboardInterrupt:
+        print("\n[mleader] Interrupted by user.")
+        sys.exit(130)
+
+def _main() -> None:
     # Printed before argparse so it also appears with --help.
     print_banner()
 

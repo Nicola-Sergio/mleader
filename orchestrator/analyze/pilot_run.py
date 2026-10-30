@@ -127,6 +127,13 @@ def _monitor_vram(
             samples.append(usage)
         time.sleep(interval_s)
 
+def _kill_container(name: str) -> None:
+    """Best effort: remove a container that may still be running."""
+    try:
+        subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=60)
+    except (subprocess.SubprocessError, OSError):
+        pass
 
 def _profile_one(
     nii_path: Path,
@@ -154,9 +161,9 @@ def _profile_one(
     # The output folder must exist and belong to the user running the container;
     # otherwise Docker creates it as root and a non-root --user cannot write to it.
     PILOT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
+    container = f"mleader_pilot_{os.getpid()}"
     cmd = [
-        "docker", "run", "--rm", "--gpus", "all",
+        "docker", "run", "--rm", "--name", container, "--gpus", "all",
         # Same as the Nextflow process: run as the calling user. Without it the
         # image falls back to its built-in "nonroot" user, which is missing from
         # the image's passwd file ("unable to find user nonroot").
@@ -184,7 +191,12 @@ def _profile_one(
         return None
     except subprocess.TimeoutExpired:
         print(f"[PilotRun] Timeout (>60min) on {nii_path.name}")
+        _kill_container(container)
         return None
+    except KeyboardInterrupt:
+        print("\n[PilotRun] Interrupted, removing the FastSurfer container...")
+        _kill_container(container)
+        raise
     finally:
         stop_event.set()
         monitor_thread.join(timeout=10)
