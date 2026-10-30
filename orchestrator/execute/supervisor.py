@@ -6,6 +6,7 @@ monitors the execution and manages adaptive retry in case of OOM.
 
 from __future__ import annotations
 
+import signal
 import subprocess
 import sys
 import time
@@ -13,6 +14,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 import os
+
+try:
+    import termios
+except ImportError:  # Windows
+    termios = None
 
 from .log_parser import classify_failure, FailureCause
 
@@ -47,6 +53,58 @@ def _build_nextflow_cmd(
     if extra_args:
         cmd.extend(extra_args)
     return cmd
+
+
+def _save_terminal():
+    """Terminal settings of stdin (None if not a TTY or not supported)."""
+    if termios is None:
+        return None
+    try:
+        if sys.stdin.isatty():
+            return termios.tcgetattr(sys.stdin.fileno())
+    except (OSError, ValueError, termios.error):
+        pass
+    return None
+
+
+def _restore_terminal(saved) -> None:
+    """Put the terminal back as it was (Nextflow's ANSI log may leave echo off)."""
+    if saved is None:
+        return
+    try:
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, saved)
+    except (OSError, ValueError, termios.error):
+        pass
+
+
+def _run_nextflow(cmd: list[str], cwd: str, env: dict):
+    """
+    Runs Nextflow and returns (completed_process, interrupted).
+
+    On Ctrl+C the terminal sends SIGINT to the whole foreground process group,
+    so Nextflow receives it too. subprocess.run would kill Nextflow with SIGKILL
+    after 0.25 s, before it can restore the terminal (typing then shows nothing).
+    Instead the signal is only recorded here: Nextflow shuts down by itself, the
+    run ends normally and the terminal settings are restored.
+    """
+    interrupted = {"flag": False}
+    saved_term = _save_terminal()
+
+    def on_sigint(signum, frame):
+        interrupted["flag"] = True
+        print("\n[Execute] Interrupt received, waiting for Nextflow to shut down...")
+
+    try:
+        previous = signal.signal(signal.SIGINT, on_sigint)
+    except ValueError:  # not in the main thread
+        previous = None
+    try:
+        proc = subprocess.run(cmd, check=False, cwd=cwd, env=env)
+    finally:
+        if previous is not None:
+            signal.signal(signal.SIGINT, previous)
+        _restore_terminal(saved_term)
+    return proc, interrupted["flag"]
 
 
 def _read_maxforks_from_config(config_path: str, brain_segmenter: str) -> Optional[int]:
@@ -115,12 +173,16 @@ def supervise(
           if profile and getattr(profile, 'pipeline_dsl', None) == "1":
             env["NXF_SYNTAX_PARSER"] = "v1"
             print("[Execute] DSL1 detected — setting NXF_SYNTAX_PARSER=v1 automatically")
-          proc = subprocess.run(cmd, check=False, cwd=repo_root, env=env)
+          proc, interrupted = _run_nextflow(cmd, repo_root, env)
         except FileNotFoundError:
             print("[Execute] ERROR: nextflow not found in PATH")
             return RunResult(success=False, returncode=127, attempts=attempts, failure_cause="nextflow_not_found")
         except KeyboardInterrupt:
             print("\n[Execute] Interrupted by user")
+            return RunResult(success=False, returncode=130, attempts=attempts, failure_cause="interrupted")
+
+        if interrupted and proc.returncode != 0:
+            print("[Execute] Interrupted by user")
             return RunResult(success=False, returncode=130, attempts=attempts, failure_cause="interrupted")
 
         if proc.returncode == 0:
